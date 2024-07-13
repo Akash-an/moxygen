@@ -172,6 +172,8 @@ void MoQSession::onClientSetup(ClientSetup clientSetup) {
           clientSetup.supportedVersions.begin(),
           clientSetup.supportedVersions.end(),
           kVersionDraftCurrent) == clientSetup.supportedVersions.end()) {
+
+    XLOG(ERR) << "Expected version = " << kVersionDraftCurrent;
     XLOG(ERR) << "No matching versions";
     for (auto v : clientSetup.supportedVersions) {
       XLOG(ERR) << "client sent=" << v;
