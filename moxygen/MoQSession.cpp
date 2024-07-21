@@ -476,8 +476,7 @@ void MoQSession::subscribeOk(SubscribeOk subOk) {
 }
 
 void MoQSession::subscribeError(SubscribeError subErr) {
-  XLOG(DBG1) << __func__ ;
-  XLOG(DBG1) << subErr;
+  XLOG(DBG1) << __func__ << subErr.reasonPhrase;
   auto res = writeSubscribeError(controlWriteBuf_, std::move(subErr));
   if (!res) {
     XLOG(ERR) << "writeSubscribeError failed";
