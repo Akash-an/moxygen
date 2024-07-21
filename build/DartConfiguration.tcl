@@ -27,7 +27,7 @@ SubmitInactivityTimeout:
 NightlyStartTime: 00:00:00 EDT
 
 # Commands for the build/test/submit cycle
-ConfigureCommand: "/usr/local/Cellar/cmake/3.29.6/bin/cmake" "/Users/akashn/Projects/MoQ/meta/moxygen"
+ConfigureCommand: "/usr/local/Cellar/cmake/3.30.0/bin/cmake" "/Users/akashn/Projects/MoQ/meta/moxygen"
 MakeCommand: /usr/local/Cellar/cmake/3.29.6/bin/cmake --build . --config "${CTEST_CONFIGURATION_TYPE}"
 DefaultCTestConfigurationType: Release
 
@@ -94,6 +94,9 @@ TimeOut: 1500
 # During parallel testing CTest will not start a new test if doing
 # so would cause the system load to exceed this value.
 TestLoad: 
+
+TLSVerify: 
+TLSVersion: 
 
 UseLaunchers: 
 CurlOptions: 

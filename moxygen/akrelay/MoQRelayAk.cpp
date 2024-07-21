@@ -36,6 +36,12 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
         announces_.find(subReq.fullTrackName.trackNamespace);
     if (upstreamSessionIt == announces_.end()) {
       // no such namespace has been announced
+      // check if the namespace exists in the peer.
+      // relay_client_ = MoQRelayClientAk(
+      //     subReq.fullTrackName.trackNamespace,
+
+      // )
+
       session->subscribeError({subReq.subscribeID, 404, "no such namespace"});
       co_return;
     }
