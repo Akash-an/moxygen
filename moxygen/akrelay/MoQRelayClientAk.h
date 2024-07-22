@@ -22,7 +22,7 @@ class MoQRelayClientAk {
 
   folly::coro::Task<void> run(
       Role role,
-      std::vector<std::string> namespaces,
+      std::vector<moxygen::SubscribeRequest> subs,
       std::chrono::milliseconds connectTimeout = std::chrono::seconds(5),
       std::chrono::milliseconds transactionTimeout = std::chrono::seconds(60)) {
     try {
@@ -40,11 +40,12 @@ class MoQRelayClientAk {
         XLOG(ERR) << "Session is dead now #sad";
         co_return;
       }
-      for (auto& ns : namespaces) {
+      for (auto& sub : subs) {
+        // auto sub = SubscribeRequest{42, 0, ns, moxygen::LocationType::LatestGroup};
         auto res =
-            co_await moqClient_.moqSession_->announce({std::move(ns), {}});
+            co_await moqClient_.moqSession_->subscribe(sub);
         if (!res) {
-          XLOG(ERR) << "AnnounceError namespace=" << res.error().trackNamespace
+          XLOG(ERR) << "Subscribe error id=" << res.error().subscribeID
                     << " code=" << res.error().errorCode
                     << " reason=" << res.error().reasonPhrase;
         }
@@ -63,7 +64,9 @@ class MoQRelayClientAk {
       if (!msg) {
         break;
       }
+      XLOG(INFO) << "Got control message"<<"about to apply controller";
       boost::apply_visitor(*controller, msg.value());
+      XLOG(INFO) << "Applied controller";
     }
   }
   MoQClient moqClient_;

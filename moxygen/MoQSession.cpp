@@ -197,6 +197,7 @@ void MoQSession::onServerSetup(ServerSetup serverSetup) {
   }
   receivedSetup_.signal();
   controlMessages_.enqueue(std::move(serverSetup));
+  XLOG(DBG1) << "setup frame enqueued";
 }
 
 void MoQSession::onObjectHeader(ObjectHeader objHeader) {

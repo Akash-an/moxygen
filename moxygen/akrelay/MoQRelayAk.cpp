@@ -5,6 +5,8 @@
  */
 
 #include "moxygen/akrelay/MoQRelayAk.h"
+#include "MoQRelayClientAk.h"
+#include "../MoQServer.h"
 
 namespace moxygen {
 
@@ -37,10 +39,20 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
     if (upstreamSessionIt == announces_.end()) {
       // no such namespace has been announced
       // check if the namespace exists in the peer.
-      // relay_client_ = MoQRelayClientAk(
-      //     subReq.fullTrackName.trackNamespace,
-
-      // )
+      folly::StringPiece url_fw("https://172-236-78-145.ip.linodeusercontent.com:4433/moq");
+      auto controllerFn = [](std::shared_ptr<MoQSession> session) {
+        // auto control = MoQServer::makeControlVisitor(clientSession);
+          return std::make_unique<MoQSession::ControlVisitor>();
+      };
+      XLOG(INFO) << "we are here";
+      MoQRelayClientAk relay_client_ = MoQRelayClientAk(
+          session->getEventBase(),
+          proxygen::URL{url_fw},
+          controllerFn
+      );
+      XLOG(INFO) << "and now here";
+      co_await relay_client_.run(Role::SUBSCRIBER, {subReq})
+      .scheduleOn(session->getEventBase()).start();
 
       session->subscribeError({subReq.subscribeID, 404, "no such namespace"});
       co_return;
