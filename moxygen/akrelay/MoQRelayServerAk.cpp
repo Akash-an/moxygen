@@ -72,12 +72,27 @@ class MoQRelayServerAk : MoQServer {
  private:
   MoQRelayAk relay_;
 };
+
+class LoggingHook : public folly::EventBase::LoopCallback {
+ public:
+  void runLoopCallback() noexcept override {
+    std::cout << "Event executed" << std::endl;
+    // You can add additional logging or handling here
+  }
+};
+
 } // namespace
+
+
 
 int main(int argc, char* argv[]) {
   folly::Init init(&argc, &argv, true);
   MoQRelayServerAk moqRelayServer;
   folly::EventBase evb;
+  
+  LoggingHook loggingHook;
+  evb.runInLoop(&loggingHook);
+  
   evb.loopForever();
   return 0;
 }

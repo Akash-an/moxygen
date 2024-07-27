@@ -27,7 +27,10 @@ class MoQSession : public MoQCodec::Callback {
       MoQCodec::Direction dir,
       proxygen::WebTransport* wt,
       folly::EventBase* evb)
-      : dir_(dir), wt_(wt), evb_(evb) {}
+      : dir_(dir), wt_(wt), evb_(evb) {
+        id = nextid;
+        nextid++;
+      }
 
   [[nodiscard]] folly::EventBase* getEventBase() const {
     return evb_;
@@ -161,6 +164,7 @@ class MoQSession : public MoQCodec::Callback {
     folly::coro::Task<
         folly::Expected<std::shared_ptr<TrackHandle>, SubscribeError>>
     ready() {
+      XLOG(INFO) << "TrackHandle::ready()";
       co_return co_await std::move(future_);
     }
 
@@ -253,6 +257,11 @@ class MoQSession : public MoQCodec::Callback {
   void onDatagram(std::unique_ptr<folly::IOBuf> datagram);
 
   folly::coro::Task<void> setupComplete();
+
+  int id;
+
+public:
+  static int nextid;
 
  private:
   folly::coro::Task<void> controlWriteLoop(

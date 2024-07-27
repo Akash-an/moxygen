@@ -15,10 +15,33 @@ class MoQRelayClientAk {
  public:
   MoQRelayClientAk(
       folly::EventBase* evb,
-      proxygen::URL url,
-      std::function<std::unique_ptr<MoQSession::ControlVisitor>(
-          std::shared_ptr<MoQSession>)> controllerFn)
-      : moqClient_(evb, url), controllerFn_(controllerFn) {}
+      proxygen::URL url)
+      : moqClient_(evb, url) {}
+
+
+    class RelayClientControlVisitor : public MoQSession::ControlVisitor {
+    public:
+      explicit RelayClientControlVisitor(
+          std::shared_ptr<MoQSession> clientSession)
+          : clientSession_(std::move(clientSession)) {}
+
+      ~RelayClientControlVisitor() override = default;
+
+      virtual void operator()(Announce announce) const  override{
+        XLOG(INFO) << "Announce ns=" << announce.trackNamespace;
+      }
+
+      virtual void operator()(SubscribeOk subscribeOk) const {
+        XLOG(INFO) << "SubscribeOk id=" << subscribeOk.subscribeID;
+        //resolve a promise here.
+      }
+    
+
+      private:
+      std::shared_ptr<MoQSession> clientSession_;
+
+    };
+
 
   folly::coro::Task<void> run(
       Role role,
@@ -29,7 +52,9 @@ class MoQRelayClientAk {
       co_await moqClient_.setupMoQSession(
           connectTimeout, transactionTimeout, role);
       auto exec = co_await folly::coro::co_current_executor;
-      auto controller = controllerFn_(moqClient_.moqSession_);
+      // auto controller = controllerFn_(moqClient_.moqSession_);
+      auto controller = std::make_unique<RelayClientControlVisitor>(moqClient_.moqSession_);
+
       if (!controller) {
         XLOG(ERR) << "Failed to make controller";
         co_return;
@@ -40,21 +65,23 @@ class MoQRelayClientAk {
         XLOG(ERR) << "Session is dead now #sad";
         co_return;
       }
-      for (auto& sub : subs) {
-        // auto sub = SubscribeRequest{42, 0, ns, moxygen::LocationType::LatestGroup};
-        auto res =
-            co_await moqClient_.moqSession_->subscribe(sub);
-        if (!res) {
-          XLOG(ERR) << "Subscribe error id=" << res.error().subscribeID
-                    << " code=" << res.error().errorCode
-                    << " reason=" << res.error().reasonPhrase;
-        }
-      }
+      // for (auto& sub : subs) {
+      //   // auto sub = SubscribeRequest{42, 0, ns, moxygen::LocationType::LatestGroup};
+      //   auto res =
+      //       co_await moqClient_.moqSession_->subscribe(sub);
+      //   if (!res) {
+      //     XLOG(ERR) << "Subscribe error id=" << res.error().subscribeID
+      //               << " code=" << res.error().errorCode
+      //               << " reason=" << res.error().reasonPhrase;
+      //   }
+      // }
     } catch (const std::exception& ex) {
       XLOG(ERR) << ex.what();
       co_return;
     }
   }
+
+  std::shared_ptr<MoQSession> getMoQSession() { return std::move(moqClient_.moqSession_); }
 
  private:
   folly::coro::Task<void> controlReadLoop(
@@ -69,6 +96,7 @@ class MoQRelayClientAk {
       XLOG(INFO) << "Applied controller";
     }
   }
+
   MoQClient moqClient_;
   std::function<std::unique_ptr<MoQSession::ControlVisitor>(
       std::shared_ptr<MoQSession>)>

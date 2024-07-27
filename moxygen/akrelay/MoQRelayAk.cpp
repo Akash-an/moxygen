@@ -34,39 +34,70 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       session->subscribeError({subReq.subscribeID, 400, "namespace required"});
       co_return;
     }
-    auto upstreamSessionIt =
-        announces_.find(subReq.fullTrackName.trackNamespace);
+    auto upstreamSessionIt = announces_.find(subReq.fullTrackName.trackNamespace);
+
     if (upstreamSessionIt == announces_.end()) {
       // no such namespace has been announced
       // check if the namespace exists in the peer.
       folly::StringPiece url_fw("https://172-236-78-145.ip.linodeusercontent.com:4433/moq");
-      auto controllerFn = [](std::shared_ptr<MoQSession> session) {
-        // auto control = MoQServer::makeControlVisitor(clientSession);
-          return std::make_unique<MoQSession::ControlVisitor>();
-      };
+      // auto controllerFn = [](std::shared_ptr<MoQSession> session) {
+      //   // auto control = MoQServer::makeControlVisitor(clientSession);
+      //     return std::make_unique<MoQSession::ControlVisitor>();
+      // };
       XLOG(INFO) << "we are here";
-      MoQRelayClientAk relay_client_ = MoQRelayClientAk(
+      auto relay_client_ = std::make_unique<MoQRelayClientAk> (
           session->getEventBase(),
-          proxygen::URL{url_fw},
-          controllerFn
+          proxygen::URL{url_fw}
       );
-      XLOG(INFO) << "and now here";
-      co_await relay_client_.run(Role::SUBSCRIBER, {subReq})
-      .scheduleOn(session->getEventBase()).start();
+      co_await relay_client_->run(Role::SUBSCRIBER, {subReq})
+                  .scheduleOn(session->getEventBase()).start();
 
-      session->subscribeError({subReq.subscribeID, 404, "no such namespace"});
-      co_return;
+      XLOG(INFO) << "successfully scheduled";
+      auto sub_session = relay_client_->getMoQSession();
+
+      relay_clients_.push_back(std::move(relay_client_));
+      if (!sub_session) {
+        XLOG(INFO) << "failed to create session";
+        co_return;
+      }
+        
+      auto trackNamespaceCopy = subReq.fullTrackName.trackNamespace;
+
+      announces_.emplace(std::move(trackNamespaceCopy), std::move(sub_session));
+      XLOG(INFO) << "Emplacing namespace: " << subReq.fullTrackName.trackNamespace;
+
+
+
+      upstreamSessionIt = announces_.find(subReq.fullTrackName.trackNamespace);      
+      XLOG(INFO) << "got here 1";
+
+      if (upstreamSessionIt == announces_.end()){
+        XLOG(INFO) << "ITS NULL 1";
+      }
+
+
+      // session->subscribeError({subReq.subscribeID, 404, "no such namespace"});
+      // co_return;
     }
+    
     if (session.get() == upstreamSessionIt->second.get()) {
       session->subscribeError({subReq.subscribeID, 400, "self subscribe"});
+      XLOG(INFO) << "used co_return 1";
       co_return;
     }
+          XLOG(INFO) << "got here 2";
+
+
+
     // TODO: we only subscribe with the downstream locations.
     auto subRes = co_await upstreamSessionIt->second->subscribe(subReq);
     if (subRes.hasError()) {
       session->subscribeError({subReq.subscribeID, 502, "subscribe failed"});
+            XLOG(INFO) << "used co_return 2";
+
       co_return;
     }
+
     forwarder = std::make_shared<MoQForwarderAk>(
         subReq.fullTrackName, subRes.value()->latest());
     RelaySubscription rsub(
@@ -93,6 +124,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 folly::coro::Task<void> MoQRelayAk::forwardTrack(
     std::shared_ptr<MoQSession::TrackHandle> track,
     std::shared_ptr<MoQForwarderAk> fowarder) {
+       XLOG(DBG1) << __func__ << " start";
   while (auto obj = co_await track->objects().next()) {
     XLOG(DBG1) << __func__
                << " new object t=" << obj.value()->fullTrackName.trackNamespace

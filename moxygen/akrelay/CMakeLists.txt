@@ -30,6 +30,8 @@ install(
     LIBRARY DESTINATION ${LIB_INSTALL_DIR}
 )
 
+set(CMAKE_BUILD_TYPE Debug)
+
 # MoQRelayServer
 add_executable(
   moqrelayserverak

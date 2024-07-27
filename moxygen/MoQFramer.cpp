@@ -5,6 +5,7 @@
  */
 
 #include "moxygen/MoQFramer.h"
+#include <folly/logging/xlog.h>
 
 namespace moxygen {
 
@@ -705,6 +706,7 @@ WriteResult writeServerSetup(
 WriteResult writeStreamHeader(
     folly::IOBufQueue& writeBuf,
     const ObjectHeader& objectHeader) noexcept {
+      XLOG(INFO) << __func__;
   size_t size = 0;
   bool error = false;
 
@@ -787,6 +789,7 @@ WriteResult writeObject(
 WriteResult writeSubscribeRequest(
     folly::IOBufQueue& writeBuf,
     const SubscribeRequest& subscribeRequest) noexcept {
+      XLOG(INFO) << __func__;
   size_t size = 0;
   bool error = false;
   writeVarint(

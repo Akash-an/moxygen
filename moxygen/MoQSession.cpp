@@ -17,7 +17,10 @@ constexpr std::chrono::seconds kSetupTimeout(5);
 
 namespace moxygen {
 
+int  MoQSession::nextid = 1;
+
 MoQSession::~MoQSession() {
+  XLOG(DBG1) << __func__;
   cancellationSource_.requestCancellation();
   for (auto& subTrack : subTracks_) {
     subTrack.second->subscribeError(
@@ -107,6 +110,7 @@ void MoQSession::setup(ServerSetup setup) {
 }
 
 folly::coro::Task<void> MoQSession::setupComplete() {
+  XLOG(DBG1) << __func__<< "setup complete called";
   auto deletedToken = cancellationSource_.getToken();
   auto token = co_await folly::coro::co_current_cancellation_token;
   folly::EventBaseThreadTimekeeper tk(*evb_);
@@ -126,11 +130,17 @@ folly::coro::Task<void> MoQSession::setupComplete() {
     close();
     co_yield folly::coro::co_error(std::runtime_error("setup failed"));
   }
+    XLOG(DBG1) << __func__<< " done" << setupComplete_;
+        XLOG(INFO) <<"id = " << id;
+
+
 }
 
 folly::coro::AsyncGenerator<MoQSession::MoQMessage>
 MoQSession::controlMessages() {
   XLOG(DBG1) << __func__;
+      XLOG(INFO) <<"id = " << id;
+
   while (true) {
     auto message =
         co_await folly::coro::co_awaitTry(folly::coro::co_withCancellation(
@@ -270,6 +280,8 @@ void MoQSession::TrackHandle::onObjectPayload(
 
 void MoQSession::onSubscribe(SubscribeRequest subscribeRequest) {
   XLOG(DBG1) << __func__;
+    XLOG(INFO) << setupComplete_;
+
   // TODO: The publisher should maintain some state like
   //   Subscribe ID -> Track Name, Locations [currently held in MoQForwarder]
   //   Track Alias -> Track Name
@@ -292,6 +304,9 @@ void MoQSession::onUnsubscribe(Unsubscribe unsubscribe) {
 
 void MoQSession::onSubscribeOk(SubscribeOk subOk) {
   XLOG(DBG1) << __func__;
+  XLOG(INFO) << setupComplete_;
+      XLOG(INFO) <<"id = " << id;
+
   auto subIt = subTracks_.find(subOk.subscribeID);
   if (subIt == subTracks_.end()) {
     // unknown
@@ -432,9 +447,12 @@ MoQSession::TrackHandle::objects() {
   auto cancelToken = co_await folly::coro::co_current_cancellation_token;
   auto mergeToken = folly::CancellationToken::merge(cancelToken, cancelToken_);
   while (!mergeToken.isCancellationRequested()) {
+    XLOG(DBG1) << "newObjects_ wait in while loop";
     auto obj = co_await folly::coro::co_withCancellation(
         mergeToken, newObjects_.dequeue());
+    XLOG(DBG1) << "newObjects_ found";
     if (!obj) {
+      XLOG(DBG1) << "newObjects_ closed";
       break;
     }
     co_yield obj;
@@ -445,6 +463,8 @@ folly::coro::Task<
     folly::Expected<std::shared_ptr<MoQSession::TrackHandle>, SubscribeError>>
 MoQSession::subscribe(SubscribeRequest sub) {
   XLOG(DBG1) << __func__;
+    XLOG(INFO) <<"id = " << id;
+
   auto fullTrackName = sub.fullTrackName;
   auto subID = nextSubscribeID_++;
   sub.subscribeID = subID;
@@ -456,13 +476,14 @@ MoQSession::subscribe(SubscribeRequest sub) {
         SubscribeError({subID, 500, "local write failed", folly::none}));
   }
   controlWriteEvent_.signal();
+  XLOG(DBG1) << "after signal" ;
   auto res = subTracks_.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(subID),
       std::forward_as_tuple(std::make_shared<TrackHandle>(
           fullTrackName, subID, cancellationSource_.getToken())));
   XCHECK(res.second) << "Duplicate subscribe ID";
-
+XLOG(DBG1) << "at the end of subscribe" ;
   co_return co_await res.first->second->ready();
 }
 
@@ -667,7 +688,7 @@ void MoQSession::publishImpl(
 }
 
 void MoQSession::onNewUniStream(proxygen::WebTransport::StreamReadHandle* rh) {
-  XLOG(DBG1) << __func__;
+  XLOG(DBG1) << __func__ << setupComplete_<< " "<<id;
   if (!setupComplete_) {
     XLOG(ERR) << "Uni stream before setup complete";
     close();

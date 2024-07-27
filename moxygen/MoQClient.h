@@ -17,7 +17,13 @@ namespace moxygen {
 class MoQClient {
  public:
   MoQClient(folly::EventBase* evb, proxygen::URL url)
-      : evb_(evb), url_(std::move(url)) {}
+      : evb_(evb), url_(std::move(url)) {
+    XLOG(INFO) << "MoQClient created";
+      }
+
+  ~MoQClient() {
+    XLOG(INFO) << "MoQClient destroyed";
+  }
 
   folly::EventBase* getEventBase() {
     return evb_;
@@ -25,8 +31,14 @@ class MoQClient {
 
   class HTTPHandler : public proxygen::HTTPTransactionHandler {
    public:
-    explicit HTTPHandler(MoQClient& client) : client_(client) {}
+    explicit HTTPHandler(MoQClient& client) : client_(client) {
+      XLOG(INFO) << "HTTPHandler created";
+    }
 
+
+    ~HTTPHandler() override {
+      XLOG(INFO) << "HTTPHandler destroyed";
+    }
     void setTransaction(proxygen::HTTPTransaction* txn) noexcept override {
       txn_ = txn;
     }
@@ -47,15 +59,17 @@ class MoQClient {
     void onWebTransportBidiStream(
         proxygen::HTTPCodec::StreamID,
         proxygen::WebTransport::BidiStreamHandle handle) noexcept override {
-      client_.onWebTransportBidiStream(std::move(handle));
+          XLOG(INFO) << "onWebTransportBidiStream handler";
+      session_->onNewBidiStream(std::move(handle));
     }
     void onWebTransportUniStream(
         proxygen::HTTPCodec::StreamID,
         proxygen::WebTransport::StreamReadHandle* handle) noexcept override {
-      client_.onWebTransportUniStream(handle);
+      XLOG(INFO) << "onWebTransportUniStream: handler";
+      session_->onNewUniStream(std::move(handle));
     }
     void onDatagram(std::unique_ptr<folly::IOBuf> datagram) noexcept override {
-      client_.onDatagram(std::move(datagram));
+      session_->onDatagram(std::move(datagram));
     }
 
     MoQClient& client_;
@@ -65,6 +79,9 @@ class MoQClient {
         folly::coro::Future<std::shared_ptr<MoQSession>>>
         sessionContract{
             folly::coro::makePromiseContract<std::shared_ptr<MoQSession>>()};
+
+    // moxygen::MoQSession* session_{nullptr};
+    std::shared_ptr<MoQSession> session_{nullptr};
   };
 
   std::shared_ptr<MoQSession> moqSession_;

@@ -8,6 +8,7 @@
 
 #include "moxygen/MoQSession.h"
 #include "moxygen/akrelay/MoQForwarderAk.h"
+#include "moxygen/akrelay/MoQRelayClientAk.h"
 
 #include <folly/container/F14Set.h>
 #include <list>
@@ -43,6 +44,8 @@ class MoQRelayAk {
   folly::F14FastMap<std::string, std::shared_ptr<MoQSession>> announces_;
   folly::F14FastMap<FullTrackName, RelaySubscription, FullTrackName::hash>
       subscriptions_;
+
+  std::list<std::unique_ptr<moxygen::MoQRelayClientAk>> relay_clients_ = {};
 };
 
 } // namespace moxygen
