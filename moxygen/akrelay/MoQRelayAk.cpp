@@ -7,6 +7,12 @@
 #include "moxygen/akrelay/MoQRelayAk.h"
 #include "MoQRelayClientAk.h"
 #include "../MoQServer.h"
+#include "moxygen/akrelay/dbclient.h"
+
+#include <proxygen/lib/http/HTTPConnector.h>
+
+#include <chrono>
+
 
 namespace moxygen {
 
@@ -39,6 +45,35 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
     if (upstreamSessionIt == announces_.end()) {
       // no such namespace has been announced
       // check if the namespace exists in the peer.
+
+      XLOG(INFO) << "checking db";
+
+      auto db = moxygen::HarperDB(session->getEventBase());
+      folly::StringPiece dburlstr_{"http://172-236-78-145.ip.linodeusercontent.com:9926/"};
+      proxygen::URL dburl_{dburlstr_};
+
+      auto timer = folly::HHWheelTimer::newTimer(session->getEventBase(), std::chrono::milliseconds(10000));
+
+      
+      auto connector = std::make_unique<proxygen::HTTPConnector> (&db, proxygen::WheelTimerInstance(std::chrono::milliseconds(5000), session->getEventBase()));
+
+      connector->connect(session->getEventBase(),folly::SocketAddress(
+          dburl_.getHost(), dburl_.getPort(), true),std::chrono::milliseconds(10000));
+
+      db_clients_.push_back(std::move(connector));
+
+      auto dbsession_ftr = co_await co_awaitTry(std::move(db.sessionContract.second));
+
+      auto dbsession = std::move(dbsession_ftr.value());
+      proxygen::HTTPMessage req;
+      req.setMethod(proxygen::HTTPMethod::GET);
+      req.setURL("/RelayLocation/");
+      req.getHeaders().add("Authorization", "Basic SERCX0FETUlOOnBhc3N3b3Jk");
+
+      auto txn = dbsession->newTransaction(&db.httpHandler_);
+      txn->sendHeaders(req);
+      txn->sendEOM();
+
       folly::StringPiece url_fw("https://172-236-78-145.ip.linodeusercontent.com:4433/moq");
       // auto controllerFn = [](std::shared_ptr<MoQSession> session) {
       //   // auto control = MoQServer::makeControlVisitor(clientSession);

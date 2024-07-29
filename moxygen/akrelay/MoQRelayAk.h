@@ -10,6 +10,8 @@
 #include "moxygen/akrelay/MoQForwarderAk.h"
 #include "moxygen/akrelay/MoQRelayClientAk.h"
 
+#include <proxygen/lib/http/HTTPConnector.h>
+
 #include <folly/container/F14Set.h>
 #include <list>
 
@@ -46,6 +48,8 @@ class MoQRelayAk {
       subscriptions_;
 
   std::list<std::unique_ptr<moxygen::MoQRelayClientAk>> relay_clients_ = {};
+    std::list<std::unique_ptr<proxygen::HTTPConnector>> db_clients_ = {};
+
 };
 
 } // namespace moxygen
