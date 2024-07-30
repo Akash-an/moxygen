@@ -7,6 +7,8 @@
 #pragma once
 
 #include <folly/logging/xlog.h>
+#include <folly/lang/Exception.h>
+
 #include "moxygen/MoQClient.h"
 
 namespace moxygen {
@@ -18,6 +20,13 @@ class MoQRelayClientAk {
       proxygen::URL url)
       : moqClient_(evb, url) {}
 
+  ~MoQRelayClientAk() = default;
+
+  struct MoQClientError{
+    int code;
+    std::string message;
+  };
+  
 
     class RelayClientControlVisitor : public MoQSession::ControlVisitor {
     public:
@@ -49,6 +58,7 @@ class MoQRelayClientAk {
       std::chrono::milliseconds connectTimeout = std::chrono::seconds(5),
       std::chrono::milliseconds transactionTimeout = std::chrono::seconds(60)) {
     try {
+      XLOG(INFO) << "running";
       co_await moqClient_.setupMoQSession(
           connectTimeout, transactionTimeout, role);
       auto exec = co_await folly::coro::co_current_executor;
@@ -57,13 +67,15 @@ class MoQRelayClientAk {
 
       if (!controller) {
         XLOG(ERR) << "Failed to make controller";
-        co_return;
+        sessionContract_.first.setException(std::runtime_error("Failed to make controller"));
+        co_return; // folly::makeUnexpected(MoQClientError({-1, "Failed to make controller"}));
       }
       controlReadLoop(std::move(controller)).scheduleOn(exec).start();
       // could parallelize
       if (!moqClient_.moqSession_) {
         XLOG(ERR) << "Session is dead now #sad";
-        co_return;
+        sessionContract_.first.setException(std::runtime_error("Session is dead now"));
+        co_return; // folly::makeUnexpected(MoQClientError({-2, "Session is dead now"}));
       }
       // for (auto& sub : subs) {
       //   // auto sub = SubscribeRequest{42, 0, ns, moxygen::LocationType::LatestGroup};
@@ -77,12 +89,23 @@ class MoQRelayClientAk {
       // }
     } catch (const std::exception& ex) {
       XLOG(ERR) << ex.what();
-      co_return;
+      sessionContract_.first.setException(ex);
+      co_return; // folly::makeUnexpected(MoQClientError({-3, ex.what()}));
     }
+    // auto shared_session = moqClient_.moqSession_;
+    // co_return shared_session;
+
+    sessionContract_.first.setValue(moqClient_.moqSession_);
+
   }
 
   std::shared_ptr<MoQSession> getMoQSession() { return std::move(moqClient_.moqSession_); }
 
+  std::pair<
+          folly::coro::Promise<std::shared_ptr<MoQSession>>,
+          folly::coro::Future<std::shared_ptr<MoQSession>>>
+          sessionContract_{
+              folly::coro::makePromiseContract<std::shared_ptr<MoQSession>>()};
  private:
   folly::coro::Task<void> controlReadLoop(
       std::unique_ptr<MoQSession::ControlVisitor> controller) {
@@ -101,6 +124,9 @@ class MoQRelayClientAk {
   std::function<std::unique_ptr<MoQSession::ControlVisitor>(
       std::shared_ptr<MoQSession>)>
       controllerFn_;
+  
+  
+
 };
 
 } // namespace moxygen

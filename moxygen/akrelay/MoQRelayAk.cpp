@@ -84,17 +84,24 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
           session->getEventBase(),
           proxygen::URL{url_fw}
       );
-      co_await relay_client_->run(Role::SUBSCRIBER, {subReq})
-                  .scheduleOn(session->getEventBase()).start();
+
+       
+        
+
+      relay_client_->run(Role::SUBSCRIBER, {subReq}).scheduleOn(session->getEventBase()).start();
+            XLOG(INFO) << "we are here 2";      
+      auto sub_session_ftr = co_await co_awaitTry(std::move(relay_client_->sessionContract_.second));
 
       XLOG(INFO) << "successfully scheduled";
-      auto sub_session = relay_client_->getMoQSession();
+      // auto sub_session = relay_client_->getMoQSession();
 
       relay_clients_.push_back(std::move(relay_client_));
-      if (!sub_session) {
+      if (sub_session_ftr.hasException()) {
         XLOG(INFO) << "failed to create session";
         co_return;
       }
+
+      auto sub_session = std::move(sub_session_ftr).value();
         
       auto trackNamespaceCopy = subReq.fullTrackName.trackNamespace;
 
