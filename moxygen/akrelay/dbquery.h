@@ -16,9 +16,6 @@ namespace moxygen{
         
         virtual ~HarperDBQuery(){}
 
-        std::string getAnnounceInsertQuery(std::string query){
-            
-        }
 
         void getNearestRelay() {
         // folly::StringPiece dburl("https://172-236-78-145.ip.linodeusercontent.com:4433/moq");
@@ -26,13 +23,13 @@ namespace moxygen{
 
         folly::coro::Task<void> setHarperDBConnector(){
             XLOG(INFO) << "setHarperDBConnector";
-            dbconnector_ = std::make_unique<moxygen::HarperDBConnector>(evb_);
-            auto httpConnector = std::make_unique<proxygen::HTTPConnector> (&(*dbconnector_), proxygen::WheelTimerInstance(std::chrono::milliseconds(5000), evb_));
-            folly::StringPiece url_sp(DB_URL);
+            auto dbconnector = std::make_unique<moxygen::HarperDBConnector>(evb_);
+            auto httpConnector = std::make_unique<proxygen::HTTPConnector> (&(*dbconnector), proxygen::WheelTimerInstance(std::chrono::milliseconds(5000)));
+            folly::StringPiece url_sp(moxygen::DB_URL);
             proxygen::URL url{url_sp};
             httpConnector->connect(evb_,folly::SocketAddress(
                         url.getHost(), url.getPort(), true),std::chrono::milliseconds(10000));
-            // dbconnector_ = std::move(dbConnector);
+            dbconnector_ = std::move(dbconnector);
             auto session_ftr = co_await co_awaitTry(std::move(dbconnector_->sessionContract.second));
 
             session_ = std::move(session_ftr.value());
@@ -41,9 +38,10 @@ namespace moxygen{
 
 
         
-        folly::coro::Task<void> executeInsertQuery(std::string tracknamespace){
+        folly::coro::Task<void> executeInsertQuery(std::string tracknamespace, bool originalPublisher){
             XLOG(INFO) << "executeInsertQuery";
             co_await setHarperDBConnector();
+            
             txn_ = session_->newTransaction(&dbconnector_->httpHandler_);
 
             // auto wt = txn_->getTransport();
@@ -57,8 +55,9 @@ namespace moxygen{
             req.getHeaders().add("Authorization", "Basic SERCX0FETUlOOnBhc3N3b3Jk");
             req.getHeaders().add("Content-Type", "application/json");
 
-            std::string query = "insert into data.Announces (tracknamespace,relayid) values('vc','1')";
-            // std::string query = "insert into data.Announces (id, tracknamespace,relayid) values('" + tracknamespace + "','" + moxygen::RELAY_ID + "')";
+            // std::string query = "insert into data.Announces (tracknamespace, relayid, orignalPublisher) values('vc','1', true)";
+            std::string originalPublisherStr = originalPublisher ? "true" : "false";
+            std::string query = "insert into data.Announces (tracknamespace, relayid, originalPublisher) values('" + tracknamespace + "','" + moxygen::RELAY_ID + "','" + originalPublisherStr + "')";
             // {
             //     "operation": "sql",
             //     "sql": "insert into data.Announces (id, tracknamespace,relayid) values('296', 'abcd', '55')"
@@ -81,7 +80,45 @@ namespace moxygen{
             auto resp_ftr = co_await co_awaitTry(std::move(dbconnector_->httpHandler_.responseContract_.second));
             auto resp = std::move(resp_ftr.value());
             XLOG(INFO) << resp->moveToFbString().toStdString();
+            auto x = co_await co_awaitTry(std::move(dbconnector_->httpHandler_.eomContract_.second));
         }
+
+
+    folly::coro::Task<void> executeDeleteQuery(std::string tracknamespace, bool originalPublisher){
+        XLOG(INFO) << "executeDeleteQuery";
+        co_await setHarperDBConnector();
+        txn_ = session_->newTransaction(&dbconnector_->httpHandler_);
+        std::string full_url = moxygen::DB_URL;
+        folly::StringPiece full_url_sp(full_url);
+        proxygen::URL url(full_url_sp);
+        proxygen::HTTPMessage req;
+        XLOG(INFO) << "sending request for " << full_url;
+        req.setMethod(proxygen::HTTPMethod::POST);
+        req.setURL(url.makeRelativeURL());
+        req.getHeaders().add("Authorization", "Basic SERCX0FETUlOOnBhc3N3b3Jk");
+        req.getHeaders().add("Content-Type", "application/json");
+
+        std::string originalPublisherStr = originalPublisher ? "true" : "false";
+        std::string query = "delete from data.Announces where tracknamespace = '" + tracknamespace + "' where originalPublisher = '" + originalPublisherStr + "'";
+        std::string json_body = "{\"operation\":\"sql\",\"sql\":\"" + query + "\"}";
+
+        auto req_body = folly::IOBuf::copyBuffer(json_body);
+
+        auto content_length = req_body->computeChainDataLength();
+        req.getHeaders().add("Content-Length", std::to_string(content_length));
+
+        XLOG(INFO) << json_body;
+        txn_->sendHeaders(req);
+        txn_->sendBody(std::move(req_body));
+        // session_->sendBody(txn_, std::move(req_body), true, true);
+        txn_->sendEOM();
+        XLOG(INFO) << "sent eom";
+        auto resp_ftr = co_await co_awaitTry(std::move(dbconnector_->httpHandler_.responseContract_.second));
+        auto resp = std::move(resp_ftr.value());
+        XLOG(INFO) << resp->moveToFbString().toStdString();
+        auto x = co_await co_awaitTry(std::move(dbconnector_->httpHandler_.eomContract_.second));
+
+    }
 
     private:
         std::unique_ptr<moxygen::HarperDBConnector> dbconnector_{nullptr};

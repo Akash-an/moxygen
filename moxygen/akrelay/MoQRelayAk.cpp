@@ -23,8 +23,8 @@ folly::coro::Task<void> MoQRelayAk::onAnnounce(Announce ann, std::shared_ptr<MoQ
   if (ann.trackNamespace.starts_with(allowedNamespacePrefix_)) {
     session->announceOk({ann.trackNamespace});
     // insert into db
-    // auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-    co_await harperdb_->executeInsertQuery(ann.trackNamespace);
+    auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+    co_await harperdb.executeInsertQuery(ann.trackNamespace, true);
     announces_.emplace(std::move(ann.trackNamespace), std::move(session));
     XLOG(INFO) << "announced ";
  
@@ -124,6 +124,11 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       }
 
 
+      //add to tracker database
+      auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+      co_await harperdb.executeInsertQuery(subReq.fullTrackName.trackNamespace, false);
+
+
       // session->subscribeError({subReq.subscribeID, 404, "no such namespace"});
       // co_return;
     }
@@ -159,9 +164,6 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
         .scheduleOn(upstreamSessionIt->second->getEventBase())
         .start();
 
-    //add to tracker database
-    auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-    co_await harperdb.executeInsertQuery(subReq.fullTrackName.trackNamespace);
 
   } else {
     forwarder = subscriptionIt->second.forwarder;

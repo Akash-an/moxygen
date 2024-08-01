@@ -11,6 +11,11 @@
 
 namespace moxygen {
 
+
+const std:: string RELAY_ID = "1";
+// const folly::StringPiece DB_URL{"http://172-236-78-145.ip.linodeusercontent.com:9925/"};
+const std::string DB_URL = "http://172-236-78-145.ip.linodeusercontent.com:9925/";
+
 class HarperDBConnector : public proxygen::HTTPConnector::Callback {
 
 public:
@@ -51,8 +56,27 @@ public:
         void onBody(std::unique_ptr<folly::IOBuf> resp) noexcept override {
             XLOG(INFO) << "Body: " ;
             XLOG(INFO) << resp->moveToFbString().toStdString();
-            // resp_ = std::move(resp);
             responseContract_.first.setValue(std::move(resp));
+            /*this has to be written like below. it can be called multiple times*/
+            /*
+                void CurlClient::onBody(std::unique_ptr<folly::IOBuf> chain) noexcept {
+                    if (onBodyFunc_ && chain) {
+                        onBodyFunc_.value()(request_, chain.get());
+                    }
+                    if (!loggingEnabled_) {
+                        return;
+                    }
+                    CHECK(outputStream_);
+                    if (chain) {
+                        const IOBuf* p = chain.get();
+                        do {
+                        outputStream_->write((const char*)p->data(), p->length());
+                        outputStream_->flush();
+                        p = p->next();
+                        } while (p != chain.get());
+                    }
+                }
+            */
         }
 
         void onUpgrade(proxygen::UpgradeProtocol protocol) noexcept override {
@@ -76,6 +100,8 @@ public:
             if (txn_) {
                 txn_->sendAbort();
             }
+
+            eomContract_.first.setValue(0);
         }
 
         void onError(const proxygen::HTTPException& ex) noexcept override {
@@ -90,6 +116,12 @@ public:
         folly::coro::Future<std::unique_ptr<folly::IOBuf>>>
         responseContract_{
             folly::coro::makePromiseContract<std::unique_ptr<folly::IOBuf>>()};
+
+        std::pair<
+            folly::coro::Promise<int>,
+            folly::coro::Future<int>>
+        eomContract_{
+            folly::coro::makePromiseContract<int>()};
     };
 
     void connectSuccess(proxygen::HTTPUpstreamSession* session) noexcept override {

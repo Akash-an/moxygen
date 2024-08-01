@@ -19,6 +19,7 @@ moqchatclient
 moqchatserver
 moqtextclient
 moqdateserver
+moqrelayserverak
 *.cmake
 certs/
 node_modules/

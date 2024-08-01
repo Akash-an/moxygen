@@ -22,16 +22,11 @@
 
 namespace moxygen {
 
-const std:: string RELAY_ID = "1";
-// const folly::StringPiece DB_URL{"http://172-236-78-145.ip.linodeusercontent.com:9925/"};
-const std::string DB_URL = "http://172-236-78-145.ip.linodeusercontent.com:9925/";
-
 class MoQRelayAk {
  public:
 
   MoQRelayAk(){
-    auto eventBase_ = folly::EventBaseManager::get()->getEventBase();
-    harperdb_ = std::move(std::make_unique<moxygen::HarperDBQuery>(eventBase_));
+    harperdb_ = std::make_unique<moxygen::HarperDBQuery>(folly::EventBaseManager::get()->getEventBase());
   }
   void setAllowedNamespacePrefix(std::string allowed) {
     allowedNamespacePrefix_ = std::move(allowed);
