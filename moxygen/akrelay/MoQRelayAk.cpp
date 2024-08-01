@@ -26,7 +26,7 @@ folly::coro::Task<void> MoQRelayAk::onAnnounce(Announce ann, std::shared_ptr<MoQ
     auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
     co_await harperdb.executeInsertQuery(ann.trackNamespace, true);
     announces_.emplace(std::move(ann.trackNamespace), std::move(session));
-    XLOG(INFO) << "announced ";
+    XLOG(INFO) << "announced " << ann.trackNamespace;
  
     // co_await  folly::coro::sleep(std::chrono::seconds(1));
     co_return;
@@ -214,13 +214,12 @@ folly::coro::Task<void> MoQRelayAk::forwardTrack(
   }
 }
 
-void MoQRelayAk::onUnsubscribe(
+folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
     Unsubscribe unsub,
     std::shared_ptr<MoQSession> session) {
   // TODO: session+subscribe ID should uniquely identify this subscription,
   // we shouldn't need a linear search to find where to remove it.
-  for (auto subscriptionIt = subscriptions_.begin();
-       subscriptionIt != subscriptions_.end();) {
+  for (auto subscriptionIt = subscriptions_.begin();subscriptionIt != subscriptions_.end();) {
     auto& subscription = subscriptionIt->second;
     subscription.forwarder->removeSession(session, unsub.subscribeID);
     if (subscription.forwarder->empty()) {
@@ -230,6 +229,10 @@ void MoQRelayAk::onUnsubscribe(
       subscription.cancellationSource.requestCancellation();
       subscription.upstream->unsubscribe({subscription.subscribeID});
       subscriptionIt = subscriptions_.erase(subscriptionIt);
+            
+      //remove entry from tracker if it was not the originalpublisher
+      auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+      co_await harperdb.executeDeleteQuery(subscriptionIt->first.trackNamespace, false);
     } else {
       subscriptionIt++;
     }

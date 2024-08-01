@@ -50,8 +50,12 @@ class MoQRelayServerAk : MoQServer {
 
     void operator()(Unsubscribe unsubscribe) const override {
       XLOG(INFO) << "Unsubscribe id=" << unsubscribe.subscribeID;
-      server_.relay_.onUnsubscribe(std::move(unsubscribe), clientSession_);
+      server_.relay_.onUnsubscribe(std::move(unsubscribe), clientSession_)
+          .scheduleOn(clientSession_->getEventBase())
+          .start();;
     }
+
+    void operator()(Unannounce unannounce) const override {}
 
     void operator()(Goaway) const override {
       XLOG(INFO) << "Goaway";

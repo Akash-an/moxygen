@@ -57,7 +57,7 @@ namespace moxygen{
 
             // std::string query = "insert into data.Announces (tracknamespace, relayid, orignalPublisher) values('vc','1', true)";
             std::string originalPublisherStr = originalPublisher ? "true" : "false";
-            std::string query = "insert into data.Announces (tracknamespace, relayid, originalPublisher) values('" + tracknamespace + "','" + moxygen::RELAY_ID + "','" + originalPublisherStr + "')";
+            std::string query = "insert into data.Announces (tracknamespace, relayid, originalpublisher) values('" + tracknamespace + "','" + moxygen::RELAY_ID + "'," + originalPublisherStr + ")";
             // {
             //     "operation": "sql",
             //     "sql": "insert into data.Announces (id, tracknamespace,relayid) values('296', 'abcd', '55')"
@@ -99,7 +99,7 @@ namespace moxygen{
         req.getHeaders().add("Content-Type", "application/json");
 
         std::string originalPublisherStr = originalPublisher ? "true" : "false";
-        std::string query = "delete from data.Announces where tracknamespace = '" + tracknamespace + "' where originalPublisher = '" + originalPublisherStr + "'";
+        std::string query = "delete from data.Announces where tracknamespace = '" + tracknamespace + "' where originalpublisher = " + originalPublisherStr;
         std::string json_body = "{\"operation\":\"sql\",\"sql\":\"" + query + "\"}";
 
         auto req_body = folly::IOBuf::copyBuffer(json_body);
