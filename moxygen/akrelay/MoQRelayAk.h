@@ -9,20 +9,30 @@
 #include "moxygen/MoQSession.h"
 #include "moxygen/akrelay/MoQForwarderAk.h"
 #include "moxygen/akrelay/MoQRelayClientAk.h"
+#include "moxygen/akrelay/dbclient.h"
+#include "moxygen/akrelay/dbquery.h"
 
 #include <proxygen/lib/http/HTTPConnector.h>
 
 #include <folly/container/F14Set.h>
+#include <folly/io/async/EventBaseManager.h>
+
 #include <list>
+
 
 namespace moxygen {
 
 const std:: string RELAY_ID = "1";
 // const folly::StringPiece DB_URL{"http://172-236-78-145.ip.linodeusercontent.com:9925/"};
-const std::string DB_URL = "http://172-236-78-145.ip.linodeusercontent.com:9926/";
+const std::string DB_URL = "http://172-236-78-145.ip.linodeusercontent.com:9925/";
 
 class MoQRelayAk {
  public:
+
+  MoQRelayAk(){
+    auto eventBase_ = folly::EventBaseManager::get()->getEventBase();
+    harperdb_ = std::move(std::make_unique<moxygen::HarperDBQuery>(eventBase_));
+  }
   void setAllowedNamespacePrefix(std::string allowed) {
     allowedNamespacePrefix_ = std::move(allowed);
   }
@@ -35,6 +45,7 @@ class MoQRelayAk {
 
   void removeSession(const std::shared_ptr<MoQSession>& session);
 
+  std::unique_ptr<moxygen::HarperDBQuery> harperdb_{nullptr};
  private:
   struct RelaySubscription {
     std::shared_ptr<MoQForwarderAk> forwarder;

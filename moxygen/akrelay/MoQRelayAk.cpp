@@ -7,8 +7,7 @@
 #include "moxygen/akrelay/MoQRelayAk.h"
 #include "MoQRelayClientAk.h"
 #include "../MoQServer.h"
-#include "moxygen/akrelay/dbclient.h"
-#include "moxygen/akrelay/dbquery.h"
+
 
 #include <proxygen/lib/http/HTTPConnector.h>
 
@@ -24,8 +23,8 @@ folly::coro::Task<void> MoQRelayAk::onAnnounce(Announce ann, std::shared_ptr<MoQ
   if (ann.trackNamespace.starts_with(allowedNamespacePrefix_)) {
     session->announceOk({ann.trackNamespace});
     // insert into db
-    auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-    co_await harperdb.executeInsertQuery(ann.trackNamespace);
+    // auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+    co_await harperdb_->executeInsertQuery(ann.trackNamespace);
     announces_.emplace(std::move(ann.trackNamespace), std::move(session));
     XLOG(INFO) << "announced ";
  

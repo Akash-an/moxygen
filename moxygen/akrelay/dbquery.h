@@ -47,7 +47,7 @@ namespace moxygen{
             txn_ = session_->newTransaction(&dbconnector_->httpHandler_);
 
             // auto wt = txn_->getTransport();
-            std::string full_url = moxygen::DB_URL + "application-template/insertAnnounce";
+            std::string full_url = moxygen::DB_URL;// + "application-template/insertAnnounce";
             folly::StringPiece full_url_sp(full_url);
             proxygen::URL url(full_url_sp);
             proxygen::HTTPMessage req;
@@ -57,7 +57,7 @@ namespace moxygen{
             req.getHeaders().add("Authorization", "Basic SERCX0FETUlOOnBhc3N3b3Jk");
             req.getHeaders().add("Content-Type", "application/json");
 
-            std::string query = "insert into data.Announces (id, tracknamespace,relayid) values('vc','1')";
+            std::string query = "insert into data.Announces (tracknamespace,relayid) values('vc','1')";
             // std::string query = "insert into data.Announces (id, tracknamespace,relayid) values('" + tracknamespace + "','" + moxygen::RELAY_ID + "')";
             // {
             //     "operation": "sql",
@@ -72,10 +72,8 @@ namespace moxygen{
 
             XLOG(INFO) << json_body;
             txn_->sendHeaders(req);
-            XLOG(INFO) << "sent headers";
             txn_->sendBody(std::move(req_body));
             // session_->sendBody(txn_, std::move(req_body), true, true);
-            XLOG(INFO) << "sent body";
             txn_->sendEOM();
             XLOG(INFO) << "sent eom";
 
