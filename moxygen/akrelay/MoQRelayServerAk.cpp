@@ -34,7 +34,9 @@ class MoQRelayServerAk : MoQServer {
 
     void operator()(Announce announce) const override {
       XLOG(INFO) << "Announce ns=" << announce.trackNamespace;
-      server_.relay_.onAnnounce(std::move(announce), clientSession_);
+      server_.relay_.onAnnounce(std::move(announce), clientSession_)
+          .scheduleOn(clientSession_->getEventBase())
+          .start();
     }
 
     void operator()(SubscribeRequest subscribeReq) const override {

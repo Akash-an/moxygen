@@ -7,17 +7,19 @@
 #include <proxygen/lib/http/HTTPConnector.h>
 #include <proxygen/lib/http/session/HTTPUpstreamSession.h>
 
+#pragma once
+
 namespace moxygen {
 
-class HarperDB : public proxygen::HTTPConnector::Callback {
+class HarperDBConnector : public proxygen::HTTPConnector::Callback {
 
 public:
-    HarperDB(folly::EventBase* evb) :
+    HarperDBConnector(folly::EventBase* evb) :
         evb_(evb) {
         XLOG(INFO) << "HarperDB";
     }
 
-    ~HarperDB() {
+    ~HarperDBConnector() {
         XLOG(INFO) << "~HarperDB";
     }
 
@@ -25,7 +27,7 @@ public:
 
     public:
 
-        explicit HarperHTTPHandler(HarperDB& db) : db_(db) {
+        explicit HarperHTTPHandler(HarperDBConnector& db) : db_(db) {
             XLOG(INFO) << "HarperHTTPHandler";
         }
 
@@ -49,6 +51,8 @@ public:
         void onBody(std::unique_ptr<folly::IOBuf> resp) noexcept override {
             XLOG(INFO) << "Body: " ;
             XLOG(INFO) << resp->moveToFbString().toStdString();
+            // resp_ = std::move(resp);
+            responseContract_.first.setValue(std::move(resp));
         }
 
         void onUpgrade(proxygen::UpgradeProtocol protocol) noexcept override {
@@ -78,8 +82,14 @@ public:
             XLOG(INFO) << "onError: " << ex.what();
         }
 
-        HarperDB& db_;
+        HarperDBConnector& db_;
         proxygen::HTTPTransaction* txn_{nullptr};
+        std::unique_ptr<folly::IOBuf> resp_{nullptr};
+        std::pair<
+        folly::coro::Promise<std::unique_ptr<folly::IOBuf>>,
+        folly::coro::Future<std::unique_ptr<folly::IOBuf>>>
+        responseContract_{
+            folly::coro::makePromiseContract<std::unique_ptr<folly::IOBuf>>()};
     };
 
     void connectSuccess(proxygen::HTTPUpstreamSession* session) noexcept override {
@@ -104,10 +114,6 @@ public:
         XLOG(ERR) << "Connect error: " << ex.what();
     }
 
-    void getNearestRelay() {
-        // folly::StringPiece dburl("https://172-236-78-145.ip.linodeusercontent.com:4433/moq");
-    }
-
     std::pair<
         folly::coro::Promise<proxygen::HTTPUpstreamSession*>,
         folly::coro::Future<proxygen::HTTPUpstreamSession*>>
@@ -115,10 +121,10 @@ public:
             folly::coro::makePromiseContract<proxygen::HTTPUpstreamSession*>()};
 
     HarperHTTPHandler httpHandler_{*this};
+    proxygen::HTTPUpstreamSession* session_{nullptr};  
+
 private:
     folly::EventBase* evb_{nullptr};
-    proxygen::HTTPUpstreamSession* session_{nullptr};
-    
     folly::StringPiece dburl_{"http://172-236-78-145.ip.linodeusercontent.com:9926/RelayLocation/"};
 };
 

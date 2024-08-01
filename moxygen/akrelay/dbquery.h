@@ -1,0 +1,95 @@
+#include <string>
+
+#include <proxygen/lib/http/session/HTTPUpstreamSession.h>
+
+#include <folly/logging/xlog.h>
+#include <folly/io/IOBuf.h>
+
+namespace moxygen{
+
+    class HarperDBQuery{
+    public:
+        HarperDBQuery(folly::EventBase* evb): evb_(evb){
+            XLOG(INFO) << "HarperDBQuery";
+
+        }
+        
+        virtual ~HarperDBQuery(){}
+
+        std::string getAnnounceInsertQuery(std::string query){
+            
+        }
+
+        void getNearestRelay() {
+        // folly::StringPiece dburl("https://172-236-78-145.ip.linodeusercontent.com:4433/moq");
+        }
+
+        folly::coro::Task<void> setHarperDBConnector(){
+            XLOG(INFO) << "setHarperDBConnector";
+            dbconnector_ = std::make_unique<moxygen::HarperDBConnector>(evb_);
+            auto httpConnector = std::make_unique<proxygen::HTTPConnector> (&(*dbconnector_), proxygen::WheelTimerInstance(std::chrono::milliseconds(5000), evb_));
+            folly::StringPiece url_sp(DB_URL);
+            proxygen::URL url{url_sp};
+            httpConnector->connect(evb_,folly::SocketAddress(
+                        url.getHost(), url.getPort(), true),std::chrono::milliseconds(10000));
+            // dbconnector_ = std::move(dbConnector);
+            auto session_ftr = co_await co_awaitTry(std::move(dbconnector_->sessionContract.second));
+
+            session_ = std::move(session_ftr.value());
+
+        }
+
+
+        
+        folly::coro::Task<void> executeInsertQuery(std::string tracknamespace){
+            XLOG(INFO) << "executeInsertQuery";
+            co_await setHarperDBConnector();
+            txn_ = session_->newTransaction(&dbconnector_->httpHandler_);
+
+            // auto wt = txn_->getTransport();
+            std::string full_url = moxygen::DB_URL + "application-template/insertAnnounce";
+            folly::StringPiece full_url_sp(full_url);
+            proxygen::URL url(full_url_sp);
+            proxygen::HTTPMessage req;
+            XLOG(INFO) << "sending request for " << full_url;
+            req.setMethod(proxygen::HTTPMethod::POST);
+            req.setURL(url.makeRelativeURL());
+            req.getHeaders().add("Authorization", "Basic SERCX0FETUlOOnBhc3N3b3Jk");
+            req.getHeaders().add("Content-Type", "application/json");
+
+            std::string query = "insert into data.Announces (id, tracknamespace,relayid) values('vc','1')";
+            // std::string query = "insert into data.Announces (id, tracknamespace,relayid) values('" + tracknamespace + "','" + moxygen::RELAY_ID + "')";
+            // {
+            //     "operation": "sql",
+            //     "sql": "insert into data.Announces (id, tracknamespace,relayid) values('296', 'abcd', '55')"
+            // }
+            std::string json_body = "{\"operation\":\"sql\",\"sql\":\"" + query + "\"}";
+
+            auto req_body = folly::IOBuf::copyBuffer(json_body);
+
+            auto content_length = req_body->computeChainDataLength();
+            req.getHeaders().add("Content-Length", std::to_string(content_length));
+
+            XLOG(INFO) << json_body;
+            txn_->sendHeaders(req);
+            XLOG(INFO) << "sent headers";
+            txn_->sendBody(std::move(req_body));
+            // session_->sendBody(txn_, std::move(req_body), true, true);
+            XLOG(INFO) << "sent body";
+            txn_->sendEOM();
+            XLOG(INFO) << "sent eom";
+
+
+            auto resp_ftr = co_await co_awaitTry(std::move(dbconnector_->httpHandler_.responseContract_.second));
+            auto resp = std::move(resp_ftr.value());
+            XLOG(INFO) << resp->moveToFbString().toStdString();
+        }
+
+    private:
+        std::unique_ptr<moxygen::HarperDBConnector> dbconnector_{nullptr};
+        proxygen::HTTPUpstreamSession* session_{nullptr};
+        folly::EventBase* evb_;
+        proxygen::HTTPTransaction* txn_{nullptr};
+
+    };
+}

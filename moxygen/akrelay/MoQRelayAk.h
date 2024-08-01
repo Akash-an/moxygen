@@ -17,13 +17,17 @@
 
 namespace moxygen {
 
+const std:: string RELAY_ID = "1";
+// const folly::StringPiece DB_URL{"http://172-236-78-145.ip.linodeusercontent.com:9925/"};
+const std::string DB_URL = "http://172-236-78-145.ip.linodeusercontent.com:9926/";
+
 class MoQRelayAk {
  public:
   void setAllowedNamespacePrefix(std::string allowed) {
     allowedNamespacePrefix_ = std::move(allowed);
   }
 
-  void onAnnounce(Announce&& ann, std::shared_ptr<MoQSession> session);
+  folly::coro::Task<void> onAnnounce(Announce ann, std::shared_ptr<MoQSession> session);
   folly::coro::Task<void> onSubscribe(
       SubscribeRequest subReq,
       std::shared_ptr<MoQSession> session);
