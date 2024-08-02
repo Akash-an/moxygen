@@ -62,6 +62,13 @@ class MoQRelayServerAk : MoQServer {
           .start(); 
     }
 
+    void operator()(SubscribeDone subscribeDone) const override {
+      XLOG(INFO) << "SubscribeDone id=" << subscribeDone.subscribeID;
+      server_.relay_.onSubscribeDone(std::move(subscribeDone), clientSession_)
+          .scheduleOn(clientSession_->getEventBase())
+          .start();
+    }
+
     void operator()(Goaway) const override {
       XLOG(INFO) << "Goaway";
     }

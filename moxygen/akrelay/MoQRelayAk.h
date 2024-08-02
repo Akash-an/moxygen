@@ -37,6 +37,7 @@ class MoQRelayAk {
   folly::coro::Task<void> onUnsubscribe(Unsubscribe unsub, std::shared_ptr<MoQSession> session);
 
   folly::coro::Task<void> onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session);
+  folly::coro::Task<void> onSubscribeDone(SubscribeDone subscribeDone, std::shared_ptr<MoQSession> session);
 
   void removeSession(const std::shared_ptr<MoQSession>& session);
 

@@ -297,6 +297,7 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
       auto upstream_session = subscription.upstream;
       
       //this sends subscribe_done to subscribers
+      //todo change this forward unannounces
       subscription.forwarder->error(
         SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream unannounce"
       );
@@ -315,8 +316,31 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
   co_await harperdb.executeDeleteQuery(unAnn.trackNamespace, true);
   XLOG(INFO) << "removed from database";
   co_return;
-
-
 }
+
+
+folly::coro::Task<void> MoQRelayAk::onSubscribeDone(SubscribeDone subscribeDone, std::shared_ptr<MoQSession> session){
+
+  //remove corresponding subscription and send subscribe_done to clients
+  for (auto it = subscriptions_.begin(); it != subscriptions_.end();) {
+    if (it->second.subscribeID == subscribeDone.subscribeID) {
+      auto subscription = it->second;
+      
+      //this sends subscribe_done to subscribers
+      //todo change this forward unannounces
+      subscription.forwarder->error(
+        SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream subscribe done"
+      );
+
+      // subscription.cancellationSource.requestCancellation();
+
+      it = subscriptions_.erase(it);
+    } else {
+      it++;
+    }
+  }
+  co_return;
+}
+
 
 } // namespace moxygen
