@@ -24,7 +24,7 @@ folly::coro::Task<void> MoQRelayAk::onAnnounce(Announce ann, std::shared_ptr<MoQ
     session->announceOk({ann.trackNamespace});
     // insert into db
     auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-    co_await harperdb.executeInsertQuery(ann.trackNamespace, true);
+    // co_await harperdb.executeInsertQuery(ann.trackNamespace, true);
     announces_.emplace(std::move(ann.trackNamespace), std::move(session));
     XLOG(INFO) << "announced " << ann.trackNamespace;
  
@@ -57,31 +57,10 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
       XLOG(INFO) << "checking db";
 
-      // auto db = moxygen::HarperDBConnector(session->getEventBase());
-      // folly::StringPiece dburlstr_{"http://172-236-78-145.ip.linodeusercontent.com:9926/"};
-      // proxygen::URL dburl_{dburlstr_};
+      auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+      co_await harperdb.getNearestRelay(subReq.fullTrackName.trackNamespace);
 
-      // auto timer = folly::HHWheelTimer::newTimer(session->getEventBase(), std::chrono::milliseconds(10000));
 
-      
-      // auto connector = std::make_unique<proxygen::HTTPConnector> (&db, proxygen::WheelTimerInstance(std::chrono::milliseconds(5000), session->getEventBase()));
-
-      // connector->connect(session->getEventBase(),folly::SocketAddress(
-      //     dburl_.getHost(), dburl_.getPort(), true),std::chrono::milliseconds(10000));
-
-      // db_clients_.push_back(std::move(connector));
-
-      // auto dbsession_ftr = co_await co_awaitTry(std::move(db.sessionContract.second));
-
-      // auto dbsession = std::move(dbsession_ftr.value());
-      // proxygen::HTTPMessage req;
-      // req.setMethod(proxygen::HTTPMethod::GET);
-      // req.setURL("/RelayLocation/");
-      // req.getHeaders().add("Authorization", "Basic SERCX0FETUlOOnBhc3N3b3Jk");
-
-      // auto txn = dbsession->newTransaction(&db.httpHandler_);
-      // txn->sendHeaders(req);
-      // txn->sendEOM();
 
       folly::StringPiece url_fw("https://172-236-78-145.ip.linodeusercontent.com:4433/moq");
       // auto controllerFn = [](std::shared_ptr<MoQSession> session) {
@@ -125,8 +104,8 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
 
       //add to tracker database
-      auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-      co_await harperdb.executeInsertQuery(subReq.fullTrackName.trackNamespace, false);
+      // auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+      // co_await harperdb.executeInsertQuery(subReq.fullTrackName.trackNamespace, false);
 
 
       // session->subscribeError({subReq.subscribeID, 404, "no such namespace"});

@@ -7,13 +7,18 @@
 #include <proxygen/lib/http/HTTPConnector.h>
 #include <proxygen/lib/http/session/HTTPUpstreamSession.h>
 
+// #include <nlohmann/json.hpp>
+// using json = nlohmann::json;
+
 #pragma once
 
 namespace moxygen {
 
 
-const std:: string RELAY_ID = "1";
-// const folly::StringPiece DB_URL{"http://172-236-78-145.ip.linodeusercontent.com:9925/"};
+const std:: string RELAY_ID = "3";
+const double RELAY_LAT =  50.11552;
+const double RELAY_LON =  8.68417;
+
 const std::string DB_URL = "http://172-236-78-145.ip.linodeusercontent.com:9925/";
 
 class HarperDBConnector : public proxygen::HTTPConnector::Callback {

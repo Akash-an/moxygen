@@ -17,9 +17,6 @@ namespace moxygen{
         virtual ~HarperDBQuery(){}
 
 
-        void getNearestRelay() {
-        // folly::StringPiece dburl("https://172-236-78-145.ip.linodeusercontent.com:4433/moq");
-        }
 
         folly::coro::Task<void> setHarperDBConnector(){
             XLOG(INFO) << "setHarperDBConnector";
@@ -34,6 +31,42 @@ namespace moxygen{
 
             session_ = std::move(session_ftr.value());
 
+        }
+
+
+        folly::coro::Task<void> getNearestRelay(std::string tracknamespace) {
+            XLOG(INFO) << "getNearestRelay";
+
+            co_await setHarperDBConnector();
+            txn_ = session_->newTransaction(&dbconnector_->httpHandler_);
+
+            std::string full_url = moxygen::DB_URL;
+            folly::StringPiece full_url_sp(full_url);
+            proxygen::URL url(full_url_sp);
+            proxygen::HTTPMessage req;
+            XLOG(INFO) << "sending request for " << full_url;
+            req.setMethod(proxygen::HTTPMethod::POST);
+            req.setURL(url.makeRelativeURL());
+            req.getHeaders().add("Authorization", "Basic SERCX0FETUlOOnBhc3N3b3Jk");
+            req.getHeaders().add("Content-Type", "application/json");
+            
+            // select r.id, r.hostname, r.zone, geodistance('[77.59369,12.97194]', geo) as distance from data.RelayLocation r inner join data.Announces a on r.id = a.relayid and a.tracknamespace='vc' and r.id!='3' ORDER BY distance ASC limit 1
+            std::string query = "select r.id, r.hostname, r.zone, geodistance('[" + std::to_string(moxygen::RELAY_LON) + ", " + std::to_string(moxygen::RELAY_LAT) 
+                                    + "]', geo) as distance from data.RelayLocation r inner join data.Announces a on r.id = a.relayid and a.tracknamespace='" 
+                                    + tracknamespace + "' and r.id!='" + moxygen::RELAY_ID + "' ORDER BY distance ASC limit 1"; 
+            
+            std::string json_body = "{\"operation\":\"sql\",\"sql\":\"" + query + "\"}";
+            auto req_body = folly::IOBuf::copyBuffer(json_body);
+            
+            auto content_length = req_body->computeChainDataLength();
+            req.getHeaders().add("Content-Length", std::to_string(content_length));
+            XLOG(INFO) << json_body;
+            txn_->sendHeaders(req);
+            txn_->sendBody(std::move(req_body));
+            // session_->sendBody(txn_, std::move(req_body), true, true);
+            txn_->sendEOM();
+            XLOG(INFO) << "sent eom";
+            co_return;
         }
 
 
@@ -116,9 +149,24 @@ namespace moxygen{
         XLOG(INFO) << "sent eom";
         auto resp_ftr = co_await co_awaitTry(std::move(dbconnector_->httpHandler_.responseContract_.second));
         auto resp = std::move(resp_ftr.value());
-        XLOG(INFO) << resp->moveToFbString().toStdString();
+        XLOG(INFO) << "response: " << resp->moveToFbString().toStdString();
+        auto json_object = resp->moveToFbString().toStdString();
+        std::string hostname = extractValue(json_object, "hostname");
+        XLOG(INFO) << "hostname: " << hostname;
         auto x = co_await co_awaitTry(std::move(dbconnector_->httpHandler_.eomContract_.second));
 
+    }
+
+    std::string extractValue(const std::string& json, const std::string& key) {
+        std::string search_key = "\"" + key + "\":";
+        size_t key_pos = json.find(search_key);
+        if (key_pos == std::string::npos) {
+            return "";
+        }
+
+        size_t start_pos = json.find("\"", key_pos + search_key.length()) + 1;
+        size_t end_pos = json.find("\"", start_pos);
+        return json.substr(start_pos, end_pos - start_pos);
     }
 
     private:
