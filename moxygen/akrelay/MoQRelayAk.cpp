@@ -228,11 +228,16 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
                  << subscriptionIt->first.trackName;
       subscription.cancellationSource.requestCancellation();
       subscription.upstream->unsubscribe({subscription.subscribeID});
-      subscriptionIt = subscriptions_.erase(subscriptionIt);
-            
+
+
+      XLOG(INFO) << "Removing from database";
       //remove entry from tracker if it was not the originalpublisher
       auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
       co_await harperdb.executeDeleteQuery(subscriptionIt->first.trackNamespace, false);
+      XLOG(INFO) << "removed from database";
+
+      subscriptionIt = subscriptions_.erase(subscriptionIt);
+
     } else {
       subscriptionIt++;
     }
@@ -250,9 +255,9 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   }
   // TODO: we should keep a map from this session to all its subscriptions
   // and remove this linear search also
-  for (auto subscriptionIt = subscriptions_.begin();
-       subscriptionIt != subscriptions_.end();) {
+  for (auto subscriptionIt = subscriptions_.begin(); subscriptionIt != subscriptions_.end();) {
     auto& subscription = subscriptionIt->second;
+    //akash todo: it can be neither upstream nor downstream.. 
     if (subscription.upstream.get() == session.get()) {
       subscription.forwarder->error(
           SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream disconnect");
@@ -260,6 +265,7 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
     } else {
       subscription.forwarder->removeSession(session);
     }
+    
     if (subscription.forwarder->empty()) {
       XLOG(INFO) << "Removed last subscriber for "
                  << subscriptionIt->first.trackNamespace
@@ -270,6 +276,47 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
       subscriptionIt++;
     }
   }
+}
+
+
+folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session){
+  
+  //removed tracknamespace from your announces
+  for (auto it = announces_.begin(); it != announces_.end();) {
+    if (it->first == unAnn.trackNamespace) {
+      it = announces_.erase(it);
+    } else {
+      it++;
+    }
+  }
+
+  //remove corresponding subscription and send subscribe_done to clients
+  for (auto it = subscriptions_.begin(); it != subscriptions_.end();) {
+    if (it->first.trackNamespace == unAnn.trackNamespace) {
+      auto subscription = it->second;
+      auto upstream_session = subscription.upstream;
+      
+      //this sends subscribe_done to subscribers
+      subscription.forwarder->error(
+        SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream unannounce"
+      );
+
+      // subscription.cancellationSource.requestCancellation();
+
+      it = subscriptions_.erase(it);
+    } else {
+      it++;
+    }
+  }
+
+  XLOG(INFO) << "Removing from database";
+  //remove entry from tracker
+  auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+  co_await harperdb.executeDeleteQuery(unAnn.trackNamespace, true);
+  XLOG(INFO) << "removed from database";
+  co_return;
+
+
 }
 
 } // namespace moxygen

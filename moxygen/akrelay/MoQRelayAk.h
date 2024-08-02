@@ -33,10 +33,10 @@ class MoQRelayAk {
   }
 
   folly::coro::Task<void> onAnnounce(Announce ann, std::shared_ptr<MoQSession> session);
-  folly::coro::Task<void> onSubscribe(
-      SubscribeRequest subReq,
-      std::shared_ptr<MoQSession> session);
+  folly::coro::Task<void> onSubscribe(SubscribeRequest subReq, std::shared_ptr<MoQSession> session);
   folly::coro::Task<void> onUnsubscribe(Unsubscribe unsub, std::shared_ptr<MoQSession> session);
+
+  folly::coro::Task<void> onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session);
 
   void removeSession(const std::shared_ptr<MoQSession>& session);
 
@@ -54,11 +54,11 @@ class MoQRelayAk {
 
   std::string allowedNamespacePrefix_;
   folly::F14FastMap<std::string, std::shared_ptr<MoQSession>> announces_;
-  folly::F14FastMap<FullTrackName, RelaySubscription, FullTrackName::hash>
-      subscriptions_;
+  folly::F14FastMap<FullTrackName, RelaySubscription, FullTrackName::hash> subscriptions_;
 
+  //to remove these?
   std::list<std::unique_ptr<moxygen::MoQRelayClientAk>> relay_clients_ = {};
-    std::list<std::unique_ptr<proxygen::HTTPConnector>> db_clients_ = {};
+  std::list<std::unique_ptr<proxygen::HTTPConnector>> db_clients_ = {};
 
 };
 

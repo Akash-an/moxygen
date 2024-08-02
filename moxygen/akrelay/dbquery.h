@@ -98,8 +98,9 @@ namespace moxygen{
         req.getHeaders().add("Authorization", "Basic SERCX0FETUlOOnBhc3N3b3Jk");
         req.getHeaders().add("Content-Type", "application/json");
 
-        std::string originalPublisherStr = originalPublisher ? "true" : "false";
-        std::string query = "delete from data.Announces where tracknamespace = '" + tracknamespace + "' where originalpublisher = " + originalPublisherStr;
+    
+        std::string whereClause = originalPublisher ? "" : " and originalpublisher = false";
+        std::string query = "delete from data.Announces where tracknamespace = '" + tracknamespace + "' and relayid = '" + moxygen::RELAY_ID + "'" + whereClause;
         std::string json_body = "{\"operation\":\"sql\",\"sql\":\"" + query + "\"}";
 
         auto req_body = folly::IOBuf::copyBuffer(json_body);
