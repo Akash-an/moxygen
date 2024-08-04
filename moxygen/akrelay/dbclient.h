@@ -7,6 +7,10 @@
 #include <proxygen/lib/http/HTTPConnector.h>
 #include <proxygen/lib/http/session/HTTPUpstreamSession.h>
 
+#include <folly/io/IOBuf.h>
+#include <folly/io/IOBufQueue.h>
+#include <folly/FBString.h>
+
 // #include <nlohmann/json.hpp>
 // using json = nlohmann::json;
 
@@ -60,28 +64,10 @@ public:
 
         void onBody(std::unique_ptr<folly::IOBuf> resp) noexcept override {
             XLOG(INFO) << "Body: " ;
-            XLOG(INFO) << resp->moveToFbString().toStdString();
-            responseContract_.first.setValue(std::move(resp));
-            /*this has to be written like below. it can be called multiple times*/
-            /*
-                void CurlClient::onBody(std::unique_ptr<folly::IOBuf> chain) noexcept {
-                    if (onBodyFunc_ && chain) {
-                        onBodyFunc_.value()(request_, chain.get());
-                    }
-                    if (!loggingEnabled_) {
-                        return;
-                    }
-                    CHECK(outputStream_);
-                    if (chain) {
-                        const IOBuf* p = chain.get();
-                        do {
-                        outputStream_->write((const char*)p->data(), p->length());
-                        outputStream_->flush();
-                        p = p->next();
-                        } while (p != chain.get());
-                    }
-                }
-            */
+            // XLOG(INFO) << resp->moveToFbString().toStdString();
+            // XLOG(INFO) << resp->moveToFbString().toStdString();
+            
+            resp_.append(std::move(resp));
         }
 
         void onUpgrade(proxygen::UpgradeProtocol protocol) noexcept override {
@@ -102,9 +88,19 @@ public:
 
         void onEOM() noexcept override {
             XLOG(INFO) << "onEOM";
+            std::string collectedBody;
+            auto combinedBuffer = resp_.move();
+
+            folly::fbstring result(combinedBuffer->moveToFbString());
+            collectedBody = result.toStdString();
+
+            XLOG(INFO) << "EOM: " << collectedBody;
+            
             if (txn_) {
                 txn_->sendAbort();
             }
+
+            responseContract_.first.setValue(collectedBody);
 
             eomContract_.first.setValue(0);
         }
@@ -115,12 +111,12 @@ public:
 
         HarperDBConnector& db_;
         proxygen::HTTPTransaction* txn_{nullptr};
-        std::unique_ptr<folly::IOBuf> resp_{nullptr};
+        folly::IOBufQueue resp_{folly::IOBufQueue::cacheChainLength()};
         std::pair<
-        folly::coro::Promise<std::unique_ptr<folly::IOBuf>>,
-        folly::coro::Future<std::unique_ptr<folly::IOBuf>>>
-        responseContract_{
-            folly::coro::makePromiseContract<std::unique_ptr<folly::IOBuf>>()};
+            folly::coro::Promise<std::string>,
+            folly::coro::Future<std::string>>
+                responseContract_{
+                    folly::coro::makePromiseContract<std::string>()};
 
         std::pair<
             folly::coro::Promise<int>,
