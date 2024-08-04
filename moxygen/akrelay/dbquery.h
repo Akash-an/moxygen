@@ -5,6 +5,9 @@
 #include <folly/logging/xlog.h>
 #include <folly/io/IOBuf.h>
 
+#include "RelayGlobalVars.h"
+
+
 namespace moxygen{
 
     class HarperDBQuery{

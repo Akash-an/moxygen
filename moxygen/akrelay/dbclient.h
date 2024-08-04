@@ -2,14 +2,16 @@
 #include <folly/String.h>
 #include <folly/logging/xlog.h>
 #include <folly/io/async/EventBase.h>
+#include <folly/io/IOBuf.h>
+#include <folly/io/IOBufQueue.h>
+#include <folly/FBString.h>
+
 
 #include <proxygen/httpserver/HTTPServer.h>
 #include <proxygen/lib/http/HTTPConnector.h>
 #include <proxygen/lib/http/session/HTTPUpstreamSession.h>
 
-#include <folly/io/IOBuf.h>
-#include <folly/io/IOBufQueue.h>
-#include <folly/FBString.h>
+#include "RelayGlobalVars.h"
 
 // #include <nlohmann/json.hpp>
 // using json = nlohmann::json;
@@ -19,9 +21,6 @@
 namespace moxygen {
 
 
-const std:: string RELAY_ID = "3";
-const double RELAY_LAT =  50.11552;
-const double RELAY_LON =  8.68417;
 
 const std::string DB_URL = "http://172-236-78-145.ip.linodeusercontent.com:9925/";
 
