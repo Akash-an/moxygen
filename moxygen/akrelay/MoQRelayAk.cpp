@@ -24,7 +24,7 @@ folly::coro::Task<void> MoQRelayAk::onAnnounce(Announce ann, std::shared_ptr<MoQ
     session->announceOk({ann.trackNamespace});
     // insert into db
     auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-    // co_await harperdb.executeInsertQuery(ann.trackNamespace, true);
+    co_await harperdb.executeInsertQuery(ann.trackNamespace, true);
     announces_.emplace(std::move(ann.trackNamespace), std::move(session));
     XLOG(INFO) << "announced " << ann.trackNamespace;
  
@@ -110,7 +110,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
       //add to tracker database
       // auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-      // co_await harperdb.executeInsertQuery(subReq.fullTrackName.trackNamespace, false);
+      co_await harperdb.executeInsertQuery(subReq.fullTrackName.trackNamespace, false);
 
 
       // session->subscribeError({subReq.subscribeID, 404, "no such namespace"});

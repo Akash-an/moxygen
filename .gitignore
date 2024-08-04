@@ -28,3 +28,5 @@ package-lock.json
 DartConfiguration.tcl
 moxygen/test/
 .idea/
+DartConfiguration.tcl
+_deps/
