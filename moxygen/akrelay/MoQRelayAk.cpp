@@ -60,12 +60,14 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
       auto relay_hostname = co_await harperdb.getNearestRelay(subReq.fullTrackName.trackNamespace);
 
-      XLOG(INFO) << "relay_hostname=" << relay_hostname;
+      
       if (relay_hostname=="") {
         session->subscribeError({subReq.subscribeID, 404, "namespace not found"});
         co_return;
       }
-
+      
+      auto relay_url = "https://" + relay_hostname + ":4433/moq";
+      XLOG(INFO) << "relay_url=" << relay_url;
 
       folly::StringPiece url_fw(relay_hostname);
       // auto controllerFn = [](std::shared_ptr<MoQSession> session) {
