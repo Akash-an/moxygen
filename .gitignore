@@ -30,3 +30,4 @@ moxygen/test/
 .idea/
 DartConfiguration.tcl
 _deps/
+RelayGlobalVars.h
