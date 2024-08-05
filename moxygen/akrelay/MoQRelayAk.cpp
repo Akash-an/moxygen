@@ -38,6 +38,8 @@ folly::coro::Task<void> MoQRelayAk::onAnnounce(Announce ann, std::shared_ptr<MoQ
 folly::coro::Task<void> MoQRelayAk::onSubscribe(
     SubscribeRequest subReq,
     std::shared_ptr<MoQSession> session) {
+
+  XLOG(INFO) << "onSubscribe IN RELAY_AK";
   auto subscriptionIt = subscriptions_.find(subReq.fullTrackName);
   std::shared_ptr<MoQForwarderAk> forwarder;
   if (subscriptionIt == subscriptions_.end()) {
@@ -69,11 +71,8 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       auto relay_url = "https://" + relay_hostname + ":4433/moq";
       XLOG(INFO) << "relay_url=" << relay_url;
 
-      folly::StringPiece url_fw(relay_hostname);
-      // auto controllerFn = [](std::shared_ptr<MoQSession> session) {
-      //   // auto control = MoQServer::makeControlVisitor(clientSession);
-      //     return std::make_unique<MoQSession::ControlVisitor>();
-      // };
+      folly::StringPiece url_fw(relay_url);
+
       XLOG(INFO) << "we are here";
       auto relay_client_ = std::make_unique<MoQRelayClientAk> (
           session->getEventBase(),
@@ -124,10 +123,10 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       XLOG(INFO) << "used co_return 1";
       co_return;
     }
-          XLOG(INFO) << "got here 2";
+    XLOG(INFO) << "got here 2" << "namespace exist locally in the announces";
 
 
-
+    //session subscribe
     auto subRes = co_await upstreamSessionIt->second->subscribe(subReq);
     if (subRes.hasError()) {
       session->subscribeError({subReq.subscribeID, 502, "subscribe failed"});
@@ -200,12 +199,80 @@ folly::coro::Task<void> MoQRelayAk::forwardTrack(
   }
 }
 
-folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
+// folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
+//     Unsubscribe unsub,
+//     std::shared_ptr<MoQSession> session) {
+//   // TODO: session+subscribe ID should uniquely identify this subscription,
+//   // we shouldn't need a linear search to find where to remove it.
+//   XLOG(INFO) << "onUnsubscribe: "<< unsub.subscribeID;
+//   for (auto subscriptionIt = subscriptions_.begin();subscriptionIt != subscriptions_.end();) {
+//     auto& subscription = subscriptionIt->second;
+//     subscription.forwarder->removeSession(session, unsub.subscribeID);
+//     if (subscription.forwarder->empty()) {
+//       XLOG(INFO) << "Removed last subscriber for "
+//                  << subscriptionIt->first.trackNamespace
+//                  << subscriptionIt->first.trackName;
+//       subscription.cancellationSource.requestCancellation();
+//       subscription.upstream->unsubscribe({subscription.subscribeID});
+
+
+//       XLOG(INFO) << "Removing from database";
+//       //remove entry from tracker if it was not the originalpublisher
+//       // auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+//       // co_await harperdb.executeDeleteQuery(subscriptionIt->first.trackNamespace, false);
+//       XLOG(INFO) << "removed from database";
+
+//       subscriptionIt = subscriptions_.erase(subscriptionIt);
+//       XLOG(INFO) << "removed from subscripteions";
+
+//     } else {
+//       subscriptionIt++;
+//     }
+//   }
+// }
+
+// void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
+//   // TODO: remove linear search
+//   for (auto it = announces_.begin(); it != announces_.end();) {
+//     if (it->second.get() == session.get()) {
+//       it = announces_.erase(it);
+//     } else {
+//       it++;
+//     }
+//   }
+//   // TODO: we should keep a map from this session to all its subscriptions
+//   // and remove this linear search also
+//   for (auto subscriptionIt = subscriptions_.begin(); subscriptionIt != subscriptions_.end();) {
+//     auto& subscription = subscriptionIt->second;
+//     //akash todo: it can be neither upstream nor downstream.. 
+//     if (subscription.upstream.get() == session.get()) {
+//       subscription.forwarder->error(
+//           SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream disconnect");
+//       subscription.cancellationSource.requestCancellation();
+//     } else {
+//       subscription.forwarder->removeSession(session);
+//     }
+    
+//     if (subscription.forwarder->empty()) {
+//       XLOG(INFO) << "Removed last subscriber for "
+//                  << subscriptionIt->first.trackNamespace
+//                  << subscriptionIt->first.trackName;
+//       subscription.upstream->unsubscribe({subscription.subscribeID});
+//       subscriptionIt = subscriptions_.erase(subscriptionIt);
+//     } else {
+//       subscriptionIt++;
+//     }
+//   }
+// }
+
+
+void MoQRelayAk::onUnsubscribe(
     Unsubscribe unsub,
     std::shared_ptr<MoQSession> session) {
   // TODO: session+subscribe ID should uniquely identify this subscription,
   // we shouldn't need a linear search to find where to remove it.
-  for (auto subscriptionIt = subscriptions_.begin();subscriptionIt != subscriptions_.end();) {
+  for (auto subscriptionIt = subscriptions_.begin();
+       subscriptionIt != subscriptions_.end();) {
     auto& subscription = subscriptionIt->second;
     subscription.forwarder->removeSession(session, unsub.subscribeID);
     if (subscription.forwarder->empty()) {
@@ -214,16 +281,7 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
                  << subscriptionIt->first.trackName;
       subscription.cancellationSource.requestCancellation();
       subscription.upstream->unsubscribe({subscription.subscribeID});
-
-
-      XLOG(INFO) << "Removing from database";
-      //remove entry from tracker if it was not the originalpublisher
-      auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-      co_await harperdb.executeDeleteQuery(subscriptionIt->first.trackNamespace, false);
-      XLOG(INFO) << "removed from database";
-
       subscriptionIt = subscriptions_.erase(subscriptionIt);
-
     } else {
       subscriptionIt++;
     }
@@ -241,9 +299,9 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   }
   // TODO: we should keep a map from this session to all its subscriptions
   // and remove this linear search also
-  for (auto subscriptionIt = subscriptions_.begin(); subscriptionIt != subscriptions_.end();) {
+  for (auto subscriptionIt = subscriptions_.begin();
+       subscriptionIt != subscriptions_.end();) {
     auto& subscription = subscriptionIt->second;
-    //akash todo: it can be neither upstream nor downstream.. 
     if (subscription.upstream.get() == session.get()) {
       subscription.forwarder->error(
           SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream disconnect");
@@ -251,7 +309,6 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
     } else {
       subscription.forwarder->removeSession(session);
     }
-    
     if (subscription.forwarder->empty()) {
       XLOG(INFO) << "Removed last subscriber for "
                  << subscriptionIt->first.trackNamespace
@@ -263,7 +320,6 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
     }
   }
 }
-
 
 folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session){
   

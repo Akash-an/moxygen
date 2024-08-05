@@ -19,6 +19,7 @@ class MoQClient {
   MoQClient(folly::EventBase* evb, proxygen::URL url)
       : evb_(evb), url_(std::move(url)) {
     XLOG(INFO) << "MoQClient created";
+    XLOG(INFO) << url_.getHost() << ":" << url_.getPort();
       }
 
   ~MoQClient() {

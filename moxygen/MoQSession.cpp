@@ -131,15 +131,12 @@ folly::coro::Task<void> MoQSession::setupComplete() {
     co_yield folly::coro::co_error(std::runtime_error("setup failed"));
   }
     XLOG(DBG1) << __func__<< " done" << setupComplete_;
-        XLOG(INFO) <<"id = " << id;
-
-
 }
 
 folly::coro::AsyncGenerator<MoQSession::MoQMessage>
 MoQSession::controlMessages() {
   XLOG(DBG1) << __func__;
-      XLOG(INFO) <<"id = " << id;
+      
 
   while (true) {
     auto message =
@@ -280,7 +277,6 @@ void MoQSession::TrackHandle::onObjectPayload(
 
 void MoQSession::onSubscribe(SubscribeRequest subscribeRequest) {
   XLOG(DBG1) << __func__;
-    XLOG(INFO) << setupComplete_;
 
   // TODO: The publisher should maintain some state like
   //   Subscribe ID -> Track Name, Locations [currently held in MoQForwarder]
@@ -463,7 +459,6 @@ folly::coro::Task<
     folly::Expected<std::shared_ptr<MoQSession::TrackHandle>, SubscribeError>>
 MoQSession::subscribe(SubscribeRequest sub) {
   XLOG(DBG1) << __func__;
-    XLOG(INFO) <<"id = " << id;
 
   auto fullTrackName = sub.fullTrackName;
   auto subID = nextSubscribeID_++;
