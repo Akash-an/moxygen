@@ -22,6 +22,7 @@ set(CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/../opensource/fbcode_builder/CMake"
   # For shipit-transformed builds
   "${CMAKE_CURRENT_SOURCE_DIR}/build/fbcode_builder/CMake"
+  "${CMAKE_CURRENT_SOURCE_DIR}/_build/deps/lib/cmake"
   ${CMAKE_MODULE_PATH})
 
 option(BUILD_SHARED_LIBS
@@ -42,6 +43,17 @@ set(MOXYGEN_FBCODE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Dependencies libs
 set (DEPS_LIBRARIES_DIR ${MOXYGEN_FBCODE_ROOT}/_build/deps/lib)
+
+set (CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/_build/deps/ ${CMAKE_PREFIX_PATH})
+
+
+set(folly_DIR ${CMAKE_CURRENT_SOURCE_DIR}/_build/deps/lib/cmake/folly)
+set(wangle_DIR ${CMAKE_CURRENT_SOURCE_DIR}/_build/deps/lib/cmake/wangle)
+set(mvfst_DIR ${CMAKE_CURRENT_SOURCE_DIR}/_build/deps/lib/cmake/mvfst)
+set(proxygen_DIR ${CMAKE_CURRENT_SOURCE_DIR}/_build/deps/lib/cmake/proxygen)
+
+set(fizz_DIR ${CMAKE_CURRENT_SOURCE_DIR}/_build/deps/lib/cmake/fizz)
+
 
 # Dependencies
 #

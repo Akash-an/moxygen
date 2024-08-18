@@ -90,6 +90,13 @@ public:
             std::string collectedBody;
             auto combinedBuffer = resp_.move();
 
+            if (!combinedBuffer) {
+                XLOG(ERR) << "Error: combinedBuffer is null";
+                responseContract_.first.setValue("");
+                eomContract_.first.setValue(0);
+                return;
+            }
+
             folly::fbstring result(combinedBuffer->moveToFbString());
             collectedBody = result.toStdString();
 

@@ -32,6 +32,14 @@ install(
 
 set(CMAKE_BUILD_TYPE Debug)
 
+# if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+#   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+#   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+# endif()
+
+
+
+
 # MoQRelayServer
 add_executable(
   moqrelayserverak
@@ -51,6 +59,8 @@ target_compile_options(
   moqrelayserverak PRIVATE
   ${_MOXYGEN_COMMON_COMPILE_OPTIONS}
 )
+# target_compile_options(moqrelayserverak PRIVATE -fsanitize=address)
+# target_link_options(moqrelayserverak PRIVATE -fsanitize=address)
 target_link_libraries(
   moqrelayserverak PUBLIC
   Folly::folly

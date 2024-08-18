@@ -295,6 +295,18 @@ void MoQSession::onUnsubscribe(Unsubscribe unsubscribe) {
   XLOG(DBG1) << __func__;
   // How does this impact pending subscribes?
   // and open TrackHandles
+  auto trackIt = subTracks_.find(unsubscribe.subscribeID);
+  XLOG(INFO) << subTracks_.size();
+  if (trackIt == subTracks_.end()) {
+    // received an object for unknown sub id
+    XLOG(ERR) << "unknown subscribeID=" << unsubscribe.subscribeID;
+    for (const auto& pair : subTracks_) {
+        XLOG(INFO) << pair.first << std::endl; // `pair.first` is the key
+    }
+    return;
+  }
+  // TODO: handle final object and status code
+  trackIt->second->fin();
   controlMessages_.enqueue(std::move(unsubscribe));
 }
 
