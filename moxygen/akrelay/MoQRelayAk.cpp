@@ -53,6 +53,11 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
     }
     auto upstreamSessionIt = announces_.find(subReq.fullTrackName.trackNamespace);
 
+    XLOG(INFO) << "ANNOUNCES_ size: " << announces_.size();
+    for(auto& it : announces_) {
+      XLOG(INFO) << it.first;
+    }
+
     if (upstreamSessionIt == announces_.end()) {
       // no such namespace has been announced
       // check if the namespace exists in the peer.
@@ -204,7 +209,7 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
     std::shared_ptr<MoQSession> session) {
   // TODO: session+subscribe ID should uniquely identify this subscription,
   // we shouldn't need a linear search to find where to remove it.
-  XLOG(INFO) << "onUnsubscribe: "<< unsub.subscribeID;
+  XLOG(INFO) << "onUnsubscribe Relay: "<< unsub.subscribeID;
   for (auto subscriptionIt = subscriptions_.begin();subscriptionIt != subscriptions_.end();) {
     auto& subscription = subscriptionIt->second;
     subscription.forwarder->removeSession(session, unsub.subscribeID);
@@ -218,7 +223,7 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
       // subscription.upstream->cancellationSource_.requestCancellation();
 
       subscriptionIt = subscriptions_.erase(subscriptionIt);
-      XLOG(INFO) << "removed from subscriptions";
+      XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
 
       XLOG(INFO) << "Removing from database";
       //remove entry from tracker if it was not the originalpublisher
@@ -258,6 +263,7 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
 
 void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   // TODO: remove linear search
+  XLOG(INFO) << " Relay removeSession: " << session->id;
   for (auto it = announces_.begin(); it != announces_.end();) {
     if (it->second.get() == session.get()) {
       it = announces_.erase(it);
@@ -267,9 +273,18 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   }
   // TODO: we should keep a map from this session to all its subscriptions
   // and remove this linear search also
+
+  XLOG(INFO) << "Relay removeSession: subscriptions: " << subscriptions_.size();
+
+  if (subscriptions_.empty()) {
+    return;
+  }
+
   for (auto subscriptionIt = subscriptions_.begin();
        subscriptionIt != subscriptions_.end();) {
     auto& subscription = subscriptionIt->second;
+     XLOG(INFO) << "Relay removeSession: track: " << subscriptionIt->first.trackNamespace + " " + subscriptionIt->first.trackName;
+    XLOG(INFO) << "Relay removeSession: subscription: " << subscription.subscribeID;
     if (subscription.upstream.get() == session.get()) {
       subscription.forwarder->error(
           SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream disconnect");

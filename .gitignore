@@ -31,3 +31,6 @@ moxygen/test/
 DartConfiguration.tcl
 _deps/
 RelayGlobalVars.h
+nohup.out
+valgrind.log
+build/

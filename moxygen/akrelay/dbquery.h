@@ -29,7 +29,7 @@ namespace moxygen{
             proxygen::URL url{url_sp};
             auto sslContext = std::make_shared<folly::SSLContext>();
             httpConnector->connectSSL(evb_, folly::SocketAddress(
-                                        url.getHost(), url.getPort(), true), sslContext);
+                                        url.getHost(), url.getPort(), true), sslContext, nullptr, std::chrono::milliseconds(5000));
             // httpConnector->connect(evb_,folly::SocketAddress(
             //             url.getHost(), url.getPort(), true),std::chrono::milliseconds(10000));
             dbconnector_ = std::move(dbconnector);
