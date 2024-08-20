@@ -27,8 +27,11 @@ namespace moxygen{
             auto httpConnector = std::make_unique<proxygen::HTTPConnector> (&(*dbconnector), proxygen::WheelTimerInstance(std::chrono::milliseconds(5000)));
             folly::StringPiece url_sp(moxygen::DB_URL);
             proxygen::URL url{url_sp};
-            httpConnector->connect(evb_,folly::SocketAddress(
-                        url.getHost(), url.getPort(), true),std::chrono::milliseconds(10000));
+            auto sslContext = std::make_shared<folly::SSLContext>();
+            httpConnector->connectSSL(evb_, folly::SocketAddress(
+                                        url.getHost(), url.getPort(), true), sslContext);
+            // httpConnector->connect(evb_,folly::SocketAddress(
+            //             url.getHost(), url.getPort(), true),std::chrono::milliseconds(10000));
             dbconnector_ = std::move(dbconnector);
             auto session_ftr = co_await co_awaitTry(std::move(dbconnector_->sessionContract.second));
 

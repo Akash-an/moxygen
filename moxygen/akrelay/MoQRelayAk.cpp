@@ -141,7 +141,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
         {forwarder,
          upstreamSessionIt->second,
          (*subRes)->subscribeID(),
-         folly::CancellationSource()});
+         std::move(folly::CancellationSource())});
     auto token = rsub.cancellationSource.getToken();
     subscriptions_[subReq.fullTrackName] = std::move(rsub);
     folly::coro::co_withCancellation(
@@ -213,10 +213,9 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
                  << subscriptionIt->first.trackNamespace
                  << subscriptionIt->first.trackName;
       subscription.cancellationSource.requestCancellation();
-      subscription.upstream->unsubscribe({subscription.subscribeID});
-      // subscription.upstream->cancellationSource_.requestCancellation();
-
       auto tracknamespace = subscriptionIt->first.trackNamespace;
+      subscription.upstream->unsubscribe(Unsubscribe{subscription.subscribeID});
+      // subscription.upstream->cancellationSource_.requestCancellation();
 
       subscriptionIt = subscriptions_.erase(subscriptionIt);
       XLOG(INFO) << "removed from subscriptions";
@@ -248,7 +247,7 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
 //       XLOG(INFO) << "Removed last subscriber for "
 //                  << subscriptionIt->first.trackNamespace
 //                  << subscriptionIt->first.trackName;
-//       subscription.cancellationSource.requestCancellation();
+//       // subscription.cancellationSource.requestCancellation();
 //       subscription.upstream->unsubscribe({subscription.subscribeID});
 //       subscriptionIt = subscriptions_.erase(subscriptionIt);
 //     } else {

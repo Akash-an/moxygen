@@ -245,6 +245,9 @@ void MoQSession::TrackHandle::onObjectHeader(ObjectHeader objHeader) {
   res.first->second->fullTrackName = fullTrackName_;
   res.first->second->cancelToken = cancelToken_;
   newObjects_.enqueue(res.first->second);
+
+  XLOG(DBG1) << "size of objects now: " << objects_.size();
+  XLOG(DBG1) << "size of newObjects now: " << newObjects_.size();
 }
 
 void MoQSession::TrackHandle::fin() {
@@ -295,18 +298,18 @@ void MoQSession::onUnsubscribe(Unsubscribe unsubscribe) {
   XLOG(DBG1) << __func__;
   // How does this impact pending subscribes?
   // and open TrackHandles
-  auto trackIt = subTracks_.find(unsubscribe.subscribeID);
-  XLOG(INFO) << subTracks_.size();
-  if (trackIt == subTracks_.end()) {
-    // received an object for unknown sub id
-    XLOG(ERR) << "unknown subscribeID=" << unsubscribe.subscribeID;
-    for (const auto& pair : subTracks_) {
-        XLOG(INFO) << pair.first << std::endl; // `pair.first` is the key
-    }
-    return;
-  }
-  // TODO: handle final object and status code
-  trackIt->second->fin();
+  // auto trackIt = subTracks_.find(unsubscribe.subscribeID);
+  // XLOG(INFO) << subTracks_.size();
+  // if (trackIt == subTracks_.end()) {
+  //   // received an object for unknown sub id
+  //   XLOG(ERR) << "unknown subscribeID=" << unsubscribe.subscribeID;
+  //   for (const auto& pair : subTracks_) {
+  //       XLOG(INFO) << pair.first << std::endl; // `pair.first` is the key
+  //   }
+  //   return;
+  // }
+  // // TODO: handle final object and status code
+  // trackIt->second->fin();
   controlMessages_.enqueue(std::move(unsubscribe));
 }
 
@@ -695,7 +698,7 @@ void MoQSession::publishImpl(
 }
 
 void MoQSession::onNewUniStream(proxygen::WebTransport::StreamReadHandle* rh) {
-  XLOG(DBG1) << __func__ << setupComplete_<< " "<<id;
+  XLOG(DBG1) << __func__ << " "<<id;
   if (!setupComplete_) {
     XLOG(ERR) << "Uni stream before setup complete";
     close();

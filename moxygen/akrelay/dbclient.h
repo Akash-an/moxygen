@@ -22,7 +22,7 @@ namespace moxygen {
 
 
 
-const std::string DB_URL = "http://172-236-78-145.ip.linodeusercontent.com:9925/";
+const std::string DB_URL = "https://172-236-78-145.ip.linodeusercontent.com:9927/";
 
 class HarperDBConnector : public proxygen::HTTPConnector::Callback {
 
@@ -164,7 +164,6 @@ public:
 
 private:
     folly::EventBase* evb_{nullptr};
-    folly::StringPiece dburl_{"http://172-236-78-145.ip.linodeusercontent.com:9926/RelayLocation/"};
 };
 
 }

@@ -218,6 +218,20 @@ class MoQSession : public MoQCodec::Callback {
       return latest_;
     }
 
+    // void storeObjects(ObjectHeader objHeader) {
+    //   while (objects_.size() > 100) {
+    //     auto to_be_removed = objects_order_.dequeue();
+    //     // for (auto it = objects_.begin(); it != objects_.end();) {
+          
+    //     // }
+    //     auto it = objects_.find(to_be_removed);
+    //     if(it != objects_.end()) {
+    //       objects_.erase(it);
+    //     }
+        
+    //   }
+    // }
+
    private:
     FullTrackName fullTrackName_;
     uint64_t subscribeID_;
@@ -230,6 +244,8 @@ class MoQSession : public MoQCodec::Callback {
     folly::
         F14FastMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>>
             objects_;
+    folly::coro::UnboundedQueue<std::pair<uint64_t, uint64_t>, true, true>
+        objects_order_;
     folly::coro::UnboundedQueue<std::shared_ptr<ObjectSource>, true, true>
         newObjects_;
     folly::Optional<AbsoluteLocation> latest_;
@@ -262,6 +278,8 @@ class MoQSession : public MoQCodec::Callback {
 
 public:
   static int nextid;
+    folly::CancellationSource cancellationSource_;
+
 
  private:
   folly::coro::Task<void> controlWriteLoop(
@@ -374,7 +392,6 @@ public:
   moxygen::TimedBaton sentSetup_;
   moxygen::TimedBaton receivedSetup_;
   bool setupComplete_{false};
-  folly::CancellationSource cancellationSource_;
 
   uint64_t nextSubscribeID_{0};
 };
