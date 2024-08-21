@@ -109,7 +109,7 @@ class MoQForwarderAk {
       folly::Optional<uint64_t> subID = folly::none) {
     // The same session could have multiple subscriptions, remove all of them
     // TODO: This shouldn't need to be a linear search
-    XLOG(DBG1) << "Removing session from forwarder: " << *subID << " " << session->id;
+    XLOG(DBG1) << "Removing session from forwarder: "  << " " << session->id;
     auto x = 1;
     // if(!subscribers_.size()){
     //   XLOG(DBG1) << "subscribers empty";
@@ -124,11 +124,11 @@ class MoQForwarderAk {
                SubscribeDoneStatusCode::UNSUBSCRIBED,
                "byebyebye",
                latest_});
-               XLOG(DBG1) << "This should be printed??" << *subID;
+               XLOG(DBG1) << "This should be printed??";// << *subID;
         } // else assume the session went away ungracefully
-        XLOG(DBG1) << "Removing session from forwarderrr " << *subID;
+        XLOG(DBG1) << "Removing session from forwarderrr ";// << *subID;
         it = subscribers_.erase(it);
-                XLOG(DBG1) << "Removed session from forwarder " << *subID;
+                XLOG(DBG1) << "Removed session from forwarder ";// << *subID;
 
       } else {
         it++;

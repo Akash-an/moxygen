@@ -290,7 +290,13 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
           SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream disconnect");
       subscription.cancellationSource.requestCancellation();
     } else {
-      // subscription.forwarder->removeSession(session);
+      if (subscription.forwarder) {
+        subscription.forwarder->removeSession(session);
+      }
+      else {
+        XLOG(INFO) << "Relay removeSession: forwarder is null";
+      }
+      
     }
     if (subscription.forwarder->empty()) {
       XLOG(INFO) << "Removed last subscriber for "

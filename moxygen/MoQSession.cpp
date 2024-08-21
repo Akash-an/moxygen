@@ -158,10 +158,10 @@ folly::coro::Task<void> MoQSession::readLoop(
   // TODO: disallow OBJECT on control streams and non-object on non-control
   bool fin = false;
   while (!fin) {
-    if (readHandle==nullptr) {
-      XLOG(ERR) << "Stream closed";
-      co_return;
-    }
+    // if (readHandle==nullptr) {
+    //   XLOG(ERR) << "Stream closed";
+    //   co_return;
+    // }
     auto streamData = co_await folly::coro::co_awaitTry(
         readHandle->readStreamData().via(evb_));
     if (streamData.hasException()) {
