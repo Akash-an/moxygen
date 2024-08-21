@@ -110,7 +110,12 @@ class MoQForwarderAk {
     // The same session could have multiple subscriptions, remove all of them
     // TODO: This shouldn't need to be a linear search
     XLOG(DBG1) << "Removing session from forwarder: " << *subID << " " << session->id;
-    XLOG(DBG1) << "subscribers_.size()=" << subscribers_.size();
+
+    if(subscribers_.empty()){
+      return;
+    }
+
+    // XLOG(DBG1) << "subscribers_.size()=" << subscribers_.size();
 
     for (auto it = subscribers_.begin(); it != subscribers_.end();) {
       if (it->session.get() == session.get() && (!subID || *subID == it->subscribeID)) {

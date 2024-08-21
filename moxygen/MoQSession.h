@@ -15,6 +15,8 @@
 #include <folly/experimental/coro/Task.h>
 #include <folly/experimental/coro/UnboundedQueue.h>
 #include <folly/logging/xlog.h>
+#include <folly/container/EvictingCacheMap.h>
+
 #include "moxygen/util/TimedBaton.h"
 
 #include <boost/variant.hpp>
@@ -218,18 +220,29 @@ class MoQSession : public MoQCodec::Callback {
       return latest_;
     }
 
-    // void storeObjects(ObjectHeader objHeader) {
+    // folly::coro::Task<void> storeObjects(ObjectHeader objHeader) {
     //   while (objects_.size() > 100) {
-    //     auto to_be_removed = objects_order_.dequeue();
-    //     // for (auto it = objects_.begin(); it != objects_.end();) {
-          
-    //     // }
-    //     auto it = objects_.find(to_be_removed);
+    //     auto grp_to_be_removed = co_await objects_order_.dequeue();
+    //     auto it = objects_.find(grp_to_be_removed);
     //     if(it != objects_.end()) {
     //       objects_.erase(it);
     //     }
-        
     //   }
+
+    //  auto res = objects_.emplace(
+    //         std::piecewise_construct,
+    //         std::forward_as_tuple(std::make_pair(objHeader.group, objHeader.id)),
+    //         std::forward_as_tuple(std::make_shared<ObjectSource>())
+    //   );
+
+    //   objects_order_.enqueue(std::make_pair(objHeader.group, objHeader.id));
+      
+    //   res.first->second->header = std::move(objHeader);
+    //   res.first->second->fullTrackName = fullTrackName_;
+    //   res.first->second->cancelToken = cancelToken_;
+    //   newObjects_.enqueue(res.first->second);
+
+    //   co_return;
     // }
 
    private:
@@ -246,6 +259,10 @@ class MoQSession : public MoQCodec::Callback {
             objects_;
     folly::coro::UnboundedQueue<std::pair<uint64_t, uint64_t>, true, true>
         objects_order_;
+    
+    folly::EvictingCacheMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>> 
+        object_cache_ = folly::EvictingCacheMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>>(100);
+    
     folly::coro::UnboundedQueue<std::shared_ptr<ObjectSource>, true, true>
         newObjects_;
     folly::Optional<AbsoluteLocation> latest_;
