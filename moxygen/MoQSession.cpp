@@ -542,6 +542,7 @@ void MoQSession::subscribeOk(SubscribeOk subOk) {
 }
 
 void MoQSession::subscribeError(SubscribeError subErr) {
+  auto x=1;
   XLOG(DBG1) << __func__ << subErr.reasonPhrase;
   auto res = writeSubscribeError(controlWriteBuf_, std::move(subErr));
   if (!res) {
@@ -552,7 +553,8 @@ void MoQSession::subscribeError(SubscribeError subErr) {
 }
 
 void MoQSession::unsubscribe(Unsubscribe unsubscribe) {
-  XLOG(DBG1) << __func__;
+  auto x = 1;
+  XLOG(DBG1) << __func__ << unsubscribe.subscribeID;
   auto res = writeUnsubscribe(controlWriteBuf_, std::move(unsubscribe));
   if (!res) {
     XLOG(ERR) << "writeUnsubscribe failed";

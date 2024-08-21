@@ -211,6 +211,9 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
   // we shouldn't need a linear search to find where to remove it.
   XLOG(INFO) << "onUnsubscribe Relay: "<< unsub.subscribeID;
   for (auto subscriptionIt = subscriptions_.begin();subscriptionIt != subscriptions_.end();) {
+    if (subscriptions_.empty()) {
+          break;
+        }
     auto& subscription = subscriptionIt->second;
     subscription.forwarder->removeSession(session, unsub.subscribeID);
     if (subscription.forwarder->empty()) {
@@ -282,6 +285,7 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
 
   for (auto subscriptionIt = subscriptions_.begin();
        subscriptionIt != subscriptions_.end();) {
+        
     auto& subscription = subscriptionIt->second;
      XLOG(INFO) << "Relay removeSession: track: " << subscriptionIt->first.trackNamespace + " " + subscriptionIt->first.trackName;
     XLOG(INFO) << "Relay removeSession: subscription id: " << subscription.subscribeID;
