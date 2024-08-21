@@ -225,6 +225,17 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
       subscription.upstream->unsubscribe(Unsubscribe{subscription.subscribeID});
       // subscription.upstream->cancellationSource_.requestCancellation();
 
+      if (!announces_.empty()) {
+        for (auto it = announces_.begin(); it != announces_.end();) {
+          if (it->first == tracknamespace) {
+            it = announces_.erase(it);
+          } else {
+            it++;
+          }
+        }
+      }
+      
+
       subscriptionIt = subscriptions_.erase(subscriptionIt);
       XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
 
