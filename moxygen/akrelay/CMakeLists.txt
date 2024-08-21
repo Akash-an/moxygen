@@ -59,7 +59,7 @@ target_compile_options(
   moqrelayserverak PRIVATE
   ${_MOXYGEN_COMMON_COMPILE_OPTIONS}
 )
-target_compile_options(moqrelayserverak PRIVATE -fsanitize=address)
+# target_compile_options(moqrelayserverak PRIVATE -fsanitize=address)
 # target_link_options(moqrelayserverak PRIVATE -fsanitize=address)
 target_link_libraries(
   moqrelayserverak PUBLIC

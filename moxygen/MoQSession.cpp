@@ -158,6 +158,10 @@ folly::coro::Task<void> MoQSession::readLoop(
   // TODO: disallow OBJECT on control streams and non-object on non-control
   bool fin = false;
   while (!fin) {
+    if (readHandle==nullptr) {
+      XLOG(ERR) << "Stream closed";
+      co_return;
+    }
     auto streamData = co_await folly::coro::co_awaitTry(
         readHandle->readStreamData().via(evb_));
     if (streamData.hasException()) {
@@ -493,8 +497,8 @@ MoQSession::TrackHandle::objects() {
         mergeToken, newObjects_.dequeue());
     XLOG(DBG1) << "newObjects_ found";
     if (!obj) {
-      XLOG(DBG1) << "newObjects_ closed";
-      break;
+      XLOG(DBG1) << "newObjects_ does not exist";
+      continue;
     }
     co_yield obj;
   }

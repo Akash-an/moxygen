@@ -274,7 +274,7 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   // TODO: we should keep a map from this session to all its subscriptions
   // and remove this linear search also
 
-  XLOG(INFO) << "Relay removeSession: subscriptions: " << subscriptions_.size();
+  XLOG(INFO) << "Relay removeSession: subscriptions size: " << subscriptions_.size();
 
   if (subscriptions_.empty()) {
     return;
@@ -284,13 +284,13 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
        subscriptionIt != subscriptions_.end();) {
     auto& subscription = subscriptionIt->second;
      XLOG(INFO) << "Relay removeSession: track: " << subscriptionIt->first.trackNamespace + " " + subscriptionIt->first.trackName;
-    XLOG(INFO) << "Relay removeSession: subscription: " << subscription.subscribeID;
+    XLOG(INFO) << "Relay removeSession: subscription id: " << subscription.subscribeID;
     if (subscription.upstream.get() == session.get()) {
       subscription.forwarder->error(
           SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream disconnect");
       subscription.cancellationSource.requestCancellation();
     } else {
-      subscription.forwarder->removeSession(session);
+      // subscription.forwarder->removeSession(session);
     }
     if (subscription.forwarder->empty()) {
       XLOG(INFO) << "Removed last subscriber for "
