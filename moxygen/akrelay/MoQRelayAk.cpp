@@ -266,7 +266,7 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
 
 void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   // TODO: remove linear search
-  XLOG(INFO) << " Relay removeSession: " << session->id;
+  XLOG(INFO) << " Relay removeSession: ";// << session->id;
   for (auto it = announces_.begin(); it != announces_.end();) {
     if (it->second.get() == session.get()) {
       it = announces_.erase(it);
@@ -285,6 +285,10 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
 
   for (auto subscriptionIt = subscriptions_.begin();
        subscriptionIt != subscriptions_.end();) {
+
+        if (subscriptions_.empty()) {
+          break;
+        }
         
     auto& subscription = subscriptionIt->second;
      XLOG(INFO) << "Relay removeSession: track: " << subscriptionIt->first.trackNamespace + " " + subscriptionIt->first.trackName;
@@ -324,9 +328,15 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
       it++;
     }
   }
+  if (subscriptions_.empty()) {
+    co_return;
+  }
 
   //remove corresponding subscription and send subscribe_done to clients
   for (auto it = subscriptions_.begin(); it != subscriptions_.end();) {
+    if (subscriptions_.empty()) {
+    break;
+  }
     if (it->first.trackNamespace == unAnn.trackNamespace) {
       auto subscription = it->second;
       auto upstream_session = subscription.upstream;
@@ -356,6 +366,9 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
 
 folly::coro::Task<void> MoQRelayAk::onSubscribeDone(SubscribeDone subscribeDone, std::shared_ptr<MoQSession> session){
 
+if (subscriptions_.empty()) {
+    co_return;
+  }
   //remove corresponding subscription and send subscribe_done to clients
   for (auto it = subscriptions_.begin(); it != subscriptions_.end();) {
     if (it->second.subscribeID == subscribeDone.subscribeID) {
