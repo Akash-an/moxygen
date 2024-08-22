@@ -124,8 +124,7 @@ class MoQSession : public MoQCodec::Callback {
 
   folly::coro::AsyncGenerator<MoQMessage> controlMessages();
 
-  folly::coro::Task<folly::Expected<AnnounceOk, AnnounceError>> announce(
-      Announce ann);
+  folly::coro::Task<folly::Expected<AnnounceOk, AnnounceError>> announce(Announce ann);
   void announceOk(AnnounceOk annOk);
   void announceError(AnnounceError announceError);
   void unannounce(Unannounce unannounce);
@@ -257,9 +256,12 @@ class MoQSession : public MoQCodec::Callback {
     folly::
         F14FastMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>>
             objects_;
+          
+    //not used; for tracking the order to remove
     folly::coro::UnboundedQueue<std::pair<uint64_t, uint64_t>, true, true>
         objects_order_;
     
+    //used instead of objects_
     folly::EvictingCacheMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>> 
         object_cache_ = folly::EvictingCacheMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>>(100);
     
@@ -269,9 +271,7 @@ class MoQSession : public MoQCodec::Callback {
     folly::CancellationToken cancelToken_;
   };
 
-  folly::coro::Task<
-      folly::Expected<std::shared_ptr<TrackHandle>, SubscribeError>>
-  subscribe(SubscribeRequest sub);
+  folly::coro::Task<folly::Expected<std::shared_ptr<TrackHandle>, SubscribeError>> subscribe(SubscribeRequest sub);
   void subscribeOk(SubscribeOk subOk);
   void subscribeError(SubscribeError subErr);
   void unsubscribe(Unsubscribe unsubscribe);
@@ -295,7 +295,6 @@ class MoQSession : public MoQCodec::Callback {
 
 public:
   static int nextid;
-    folly::CancellationSource cancellationSource_;
 
 
  private:
@@ -395,6 +394,7 @@ public:
   // Subscriber State
   // Subscribe ID -> Track Handle
   folly::F14FastMap<uint64_t, std::shared_ptr<TrackHandle>> subTracks_;
+    folly::CancellationSource cancellationSource_;
 
   // Publisher State
   // Track Namespace -> Promise<AnnounceOK>

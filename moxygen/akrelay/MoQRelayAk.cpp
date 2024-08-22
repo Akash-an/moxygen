@@ -204,76 +204,76 @@ folly::coro::Task<void> MoQRelayAk::forwardTrack(
   }
 }
 
-folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
-    Unsubscribe unsub,
-    std::shared_ptr<MoQSession> session) {
-  // TODO: session+subscribe ID should uniquely identify this subscription,
-  // we shouldn't need a linear search to find where to remove it.
-  XLOG(INFO) << "onUnsubscribe Relay: "<< unsub.subscribeID;
-  for (auto subscriptionIt = subscriptions_.begin();subscriptionIt != subscriptions_.end();) {
-    if (subscriptions_.empty()) {
-          break;
-        }
-    auto& subscription = subscriptionIt->second;
-    subscription.forwarder->removeSession(session, unsub.subscribeID);
-    if (subscription.forwarder->empty()) {
-      XLOG(INFO) << "Removed last subscriber for "
-                 << subscriptionIt->first.trackNamespace
-                 << subscriptionIt->first.trackName;
-      subscription.cancellationSource.requestCancellation();
-      auto tracknamespace = subscriptionIt->first.trackNamespace;
-      subscription.upstream->unsubscribe(Unsubscribe{subscription.subscribeID});
-      // subscription.upstream->cancellationSource_.requestCancellation();
-
-      if (!announces_.empty()) {
-        for (auto it = announces_.begin(); it != announces_.end();) {
-          if (it->first == tracknamespace) {
-            it = announces_.erase(it);
-          } else {
-            it++;
-          }
-        }
-      }
-      
-
-      subscriptionIt = subscriptions_.erase(subscriptionIt);
-      XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
-
-      XLOG(INFO) << "Removing from database";
-      //remove entry from tracker if it was not the originalpublisher
-      auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-      co_await harperdb.executeDeleteQuery(tracknamespace, false);
-      XLOG(INFO) << "removed from database";
-
-
-    } else {
-      subscriptionIt++;
-    }
-  }
-}
-
-
-// void MoQRelayAk::onUnsubscribe(
+// folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
 //     Unsubscribe unsub,
 //     std::shared_ptr<MoQSession> session) {
 //   // TODO: session+subscribe ID should uniquely identify this subscription,
 //   // we shouldn't need a linear search to find where to remove it.
-//   for (auto subscriptionIt = subscriptions_.begin();
-//        subscriptionIt != subscriptions_.end();) {
+//   XLOG(INFO) << "onUnsubscribe Relay: "<< unsub.subscribeID;
+//   for (auto subscriptionIt = subscriptions_.begin();subscriptionIt != subscriptions_.end();) {
+//     if (subscriptions_.empty()) {
+//           break;
+//         }
 //     auto& subscription = subscriptionIt->second;
 //     subscription.forwarder->removeSession(session, unsub.subscribeID);
 //     if (subscription.forwarder->empty()) {
 //       XLOG(INFO) << "Removed last subscriber for "
 //                  << subscriptionIt->first.trackNamespace
 //                  << subscriptionIt->first.trackName;
-//       // subscription.cancellationSource.requestCancellation();
-//       subscription.upstream->unsubscribe({subscription.subscribeID});
+//       subscription.cancellationSource.requestCancellation();
+//       auto tracknamespace = subscriptionIt->first.trackNamespace;
+//       subscription.upstream->unsubscribe(Unsubscribe{subscription.subscribeID});
+//       // subscription.upstream->cancellationSource_.requestCancellation();
+
+//       if (!announces_.empty()) {
+//         for (auto it = announces_.begin(); it != announces_.end();) {
+//           if (it->first == tracknamespace) {
+//             it = announces_.erase(it);
+//           } else {
+//             it++;
+//           }
+//         }
+//       }
+      
+
 //       subscriptionIt = subscriptions_.erase(subscriptionIt);
+//       XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
+
+//       XLOG(INFO) << "Removing from database";
+//       //remove entry from tracker if it was not the originalpublisher
+//       auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+//       co_await harperdb.executeDeleteQuery(tracknamespace, false);
+//       XLOG(INFO) << "removed from database";
+
+
 //     } else {
 //       subscriptionIt++;
 //     }
 //   }
 // }
+
+
+void MoQRelayAk::onUnsubscribe(
+    Unsubscribe unsub,
+    std::shared_ptr<MoQSession> session) {
+  // TODO: session+subscribe ID should uniquely identify this subscription,
+  // we shouldn't need a linear search to find where to remove it.
+  for (auto subscriptionIt = subscriptions_.begin();
+       subscriptionIt != subscriptions_.end();) {
+    auto& subscription = subscriptionIt->second;
+    subscription.forwarder->removeSession(session, unsub.subscribeID);
+    if (subscription.forwarder->empty()) {
+      XLOG(INFO) << "Removed last subscriber for "
+                 << subscriptionIt->first.trackNamespace
+                 << subscriptionIt->first.trackName;
+      // subscription.cancellationSource.requestCancellation();
+      subscription.upstream->unsubscribe({subscription.subscribeID});
+      subscriptionIt = subscriptions_.erase(subscriptionIt);
+    } else {
+      subscriptionIt++;
+    }
+  }
+}
 
 void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   // TODO: remove linear search
