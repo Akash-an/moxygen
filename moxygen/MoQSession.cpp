@@ -250,12 +250,12 @@ void MoQSession::TrackHandle::onObjectHeader(ObjectHeader objHeader) {
   newObjects_.enqueue(res.first->second);
 
 
-  auto obj_source = std::make_shared<ObjectSource>();
-  obj_source->header = std::move(objHeader);
-  obj_source->fullTrackName = fullTrackName_;
-  obj_source->cancelToken = cancelToken_;
-  newObjects_.enqueue(obj_source);
-  object_cache_.set(std::make_pair(objHeader.group, objHeader.id), std::move(obj_source));
+  // auto obj_source = std::make_shared<ObjectSource>();
+  // obj_source->header = std::move(objHeader);
+  // obj_source->fullTrackName = fullTrackName_;
+  // obj_source->cancelToken = cancelToken_;
+  // newObjects_.enqueue(obj_source);
+  // object_cache_.set(std::make_pair(objHeader.group, objHeader.id), std::move(obj_source));
   
 
 
@@ -509,7 +509,7 @@ MoQSession::TrackHandle::objects() {
     XLOG(DBG1) << "newObjects_ found";
     if (!obj) {
       XLOG(DBG1) << "newObjects_ does not exist";
-      continue;
+      break;
     }
     co_yield obj;
   }

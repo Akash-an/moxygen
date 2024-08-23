@@ -232,7 +232,7 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
       //   }
       // }
       
-
+      XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_.size();
       subscriptionIt = subscriptions_.erase(subscriptionIt);
       XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
 
@@ -334,7 +334,9 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
     }
 
     if (remove_sub) {
+      XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_.size();
       subscriptionIt = subscriptions_.erase(subscriptionIt);
+      XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
     } else {
       subscriptionIt++;
     }
@@ -387,8 +389,10 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
 
       //send unannounce to subscribers
       subscription.forwarder->forwardUnannounce(unAnn);
-
+      
+      XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_.size();
       it = subscriptions_.erase(it);
+      XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
     } else {
       it++;
     }
@@ -426,7 +430,10 @@ folly::coro::Task<void> MoQRelayAk::onSubscribeDone(SubscribeDone subscribeDone,
 
       subscription.cancellationSource.requestCancellation();
 
+      XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_.size();
       it = subscriptions_.erase(it);
+      XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
+
     } else {
       it++;
     }
