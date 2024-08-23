@@ -203,6 +203,8 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
   // TODO: session+subscribe ID should uniquely identify this subscription,
   // we shouldn't need a linear search to find where to remove it.
   XLOG(INFO) << "onUnsubscribe Relay: "<< unsub.subscribeID;
+
+  std::set<std::string> pendingDeletions;
   for (auto subscriptionIt = subscriptions_.begin();subscriptionIt != subscriptions_.end();) {
     if (subscriptions_.empty()) {
       XLOG(INFO) << "no subscriptions left.. we shouldn't be here";
@@ -213,40 +215,44 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
     if (subscription.forwarder->empty()) {
       XLOG(INFO) << "Removed last subscriber for " << subscriptionIt->first.trackNamespace << "/"<< subscriptionIt->first.trackName;
       subscription.cancellationSource.requestCancellation();
-      auto tracknamespace = subscriptionIt->first.trackNamespace;
-      
+      pendingDeletions.insert(subscriptionIt->first.trackNamespace);
       //forward the unsubscribe to the upstream publisher
       subscription.upstream->unsubscribe(Unsubscribe{subscription.subscribeID});
-      
-      XLOG(INFO) << "Removing from announces, now len is: " << announces_.size();
-      auto ann_it = announces_.find(tracknamespace);
-      
-      //we want to remove only if the upstream session is to a relay
-      if (ann_it != announces_.end()) {
-        auto first_relay_it = first_relay_.find(tracknamespace);
-        if (first_relay_it != first_relay_.end()) {
-          if (first_relay_it->second == false){
-            first_relay_.erase(first_relay_it);
-            announces_.erase(ann_it);
-          }
-        }
-      }
-      XLOG(INFO) << "Removed from announces, now len is: " << announces_.size();
-      
+          
       XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_.size();
       subscriptionIt = subscriptions_.erase(subscriptionIt);
       XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
 
-      XLOG(INFO) << "Removing from database";
-      //remove entry from tracker if it was not the originalpublisher
-      auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-      co_await harperdb.executeDeleteQuery(tracknamespace, false);
-      XLOG(INFO) << "removed from database";
-    
     } else {
       subscriptionIt++;
     }
   }
+
+  //we want to remove the announces added during subscription
+  XLOG(INFO) << "pending deletions size: " << pendingDeletions.size();
+  for (const auto& tracknamespace : pendingDeletions) {
+    XLOG(INFO) << "Removing from announces, now len is: " << announces_.size();
+    auto ann_it = announces_.find(tracknamespace);    
+    if (ann_it != announces_.end()) {
+      //we want to remove only if the upstream session is to a relay
+      auto first_relay_it = first_relay_.find(tracknamespace);
+      if (first_relay_it != first_relay_.end()) {
+        if (first_relay_it->second == false){
+          first_relay_.erase(first_relay_it);
+          announces_.erase(ann_it);
+        }
+      }
+    }
+  }
+
+  auto harperdb = moxygen::HarperDBQuery(folly::EventBaseManager::get()->getEventBase());
+  //this is in a seperate loop to prevent iteartor invalidation during erase.
+  for (const auto& tracknamespace : pendingDeletions) {
+    //remove entry from tracker if it was not the originalpublisher
+    XLOG(DBG1) << "Removing from database: " << tracknamespace;
+    co_await harperdb.executeDeleteQuery(tracknamespace, false);
+  }
+  
 }
 
 
@@ -282,12 +288,11 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
 
   XLOG(INFO) << " Relay removeSession: ";// << session->id;
   bool remove_from_db = false;
-  std::string tracknamespace; 
+  std::set<std::string> pendingDeletions;
   XLOG(INFO) << "Removing from announces, now len is: " << announces_.size();
   for (auto it = announces_.begin(); it != announces_.end();) {
     if (it->second.get() == session.get()) {
-      remove_from_db = true;
-      tracknamespace = it->first;
+      pendingDeletions.insert(it->first);
       it = announces_.erase(it);
       first_relay_.erase(it->first);
     } else {
@@ -312,7 +317,6 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
     }
     bool remove_sub = false;   
     auto& subscription = subscriptionIt->second;
-    tracknamespace = subscriptionIt->first.trackNamespace;
     XLOG(INFO) << "Relay removeSession: track: " << subscriptionIt->first.trackNamespace + " " + subscriptionIt->first.trackName;
     XLOG(INFO) << "Relay removeSession: subscription id: " << subscription.subscribeID;
     if (subscription.upstream.get() == session.get()) {
@@ -320,7 +324,7 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
       subscription.forwarder->error(
           SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream disconnect");
       subscription.cancellationSource.requestCancellation();
-      remove_from_db = true;
+      pendingDeletions.insert(subscriptionIt->first.trackNamespace); 
       remove_sub = true;
     } else {
       // its a downstream disconnect
@@ -329,9 +333,8 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
         XLOG(INFO) << "Removed last subscriber for "<< subscriptionIt->first.trackNamespace << subscriptionIt->first.trackName;
         subscription.upstream->unsubscribe({subscription.subscribeID});
         remove_sub = true;
-        remove_from_db = true;
+        pendingDeletions.insert(subscriptionIt->first.trackNamespace); 
         subscription.cancellationSource.requestCancellation();
-        
       } 
     }
 
@@ -342,42 +345,25 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
     } else {
       subscriptionIt++;
     }
-    
   }
 
-  //remove from db if needed
-  if (remove_from_db) {
-    // auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-    // harperdb_->executeDeleteQuery(std::move(tracknamespace), true).scheduleOn(std::move(session->getEventBase())).start();
-
-    harperdb_ = std::make_unique<moxygen::HarperDBQuery>(folly::EventBaseManager::get()->getEventBase());
+  XLOG(INFO) << "Relay removeSession: pendingDeletions size: " << pendingDeletions.size();
+  harperdb_ = std::make_unique<moxygen::HarperDBQuery>(folly::EventBaseManager::get()->getEventBase());
+  for (const auto& tracknamespace : pendingDeletions) {
+    XLOG(INFO) << "Relay removeSession: removing from db: " << tracknamespace;
     harperdb_->executeDeleteQuery(tracknamespace, true).scheduleOn(folly::EventBaseManager::get()->getEventBase()).start();
-    XLOG(INFO) << "Removed from database";
   }
-
 }
 
 folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session){
   
   XLOG(INFO) << "RelayAK onUnannounce: " << unAnn.trackNamespace;
-  //remove tracknamespace from your announces
-  // for (auto it = announces_.begin(); it != announces_.end();) {
-  //   if (it->first == unAnn.trackNamespace) {
-  //     it = announces_.erase(it);
-  //   } else {
-  //     it++;
-  //   }
-  // }
 
   auto it = announces_.find(unAnn.trackNamespace);
   if (it != announces_.end()) {
     announces_.erase(it);
     first_relay_.erase(unAnn.trackNamespace);
   }
-
-  // if (subscriptions_.empty()) {
-  //   co_return;
-  // }
 
   //remove corresponding subscription and send unannounce to clients
   for (auto it = subscriptions_.begin(); it != subscriptions_.end();) {
@@ -403,8 +389,6 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
 
   XLOG(DBG1) << "Removing from database";
   auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-  // folly::BlockingWait(harperdb.executeDeleteQuery(unAnn.trackNamespace, true));
-  // harperdb_ = std::make_unique<moxygen::HarperDBQuery>(folly::EventBaseManager::get()->getEventBase());
   co_await harperdb.executeDeleteQuery(unAnn.trackNamespace, true);
   XLOG(DBG1) << "removed from database";
   co_return;
@@ -413,10 +397,7 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
 
 folly::coro::Task<void> MoQRelayAk::onSubscribeDone(SubscribeDone subscribeDone, std::shared_ptr<MoQSession> session){
 
-// if (subscriptions_.empty()) {
-//     co_return;
-//   }
-  //remove corresponding subscription and send subscribe_done to clients
+  //remove corresponding subscription and send subscribe_done to downstreamclients
   for (auto it = subscriptions_.begin(); it != subscriptions_.end();) {
     if (subscriptions_.empty()) {
       XLOG(ERR) << "subscriptions_.empty().. why enter the loop??";
@@ -424,25 +405,20 @@ folly::coro::Task<void> MoQRelayAk::onSubscribeDone(SubscribeDone subscribeDone,
     }
     if (it->second.subscribeID == subscribeDone.subscribeID) {
       auto subscription = it->second;
-      
-      //this sends subscribe_done to subscribers
-      //todo change this forward unannounces
       subscription.forwarder->error(
         SubscribeDoneStatusCode::SUBSCRIPTION_ENDED, "upstream subscribe done"
       );
-
       subscription.cancellationSource.requestCancellation();
 
       XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_.size();
       it = subscriptions_.erase(it);
       XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_.size();
-
     } else {
       it++;
     }
   }
+  //todo: should I add a database delete here? 
+  //subscribe_done is sent only after unsubscribe.. so it would be redundant.
   co_return;
 }
-
-
 } // namespace moxygen
