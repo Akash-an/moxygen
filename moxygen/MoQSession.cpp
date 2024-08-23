@@ -158,10 +158,9 @@ folly::coro::Task<void> MoQSession::readLoop(
   // TODO: disallow OBJECT on control streams and non-object on non-control
   bool fin = false;
   while (!fin) {
-    // if (readHandle==nullptr) {
-    //   XLOG(ERR) << "Stream closed";
-    //   co_return;
-    // }
+    if (readHandle==nullptr) {
+      XLOG(ERR) << "Stream closed... add this nullptr check";
+    }
     auto streamData = co_await folly::coro::co_awaitTry(
         readHandle->readStreamData().via(evb_));
     if (streamData.hasException()) {
@@ -241,14 +240,14 @@ void MoQSession::onObjectPayload(
 
 void MoQSession::TrackHandle::onObjectHeader(ObjectHeader objHeader) {
   XLOG(DBG1) << __func__;
-  // auto res = objects_.emplace(
-  //     std::piecewise_construct,
-  //     std::forward_as_tuple(std::make_pair(objHeader.group, objHeader.id)),
-  //     std::forward_as_tuple(std::make_shared<ObjectSource>()));
-  // res.first->second->header = std::move(objHeader);
-  // res.first->second->fullTrackName = fullTrackName_;
-  // res.first->second->cancelToken = cancelToken_;
-  // newObjects_.enqueue(res.first->second);
+  auto res = objects_.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(std::make_pair(objHeader.group, objHeader.id)),
+      std::forward_as_tuple(std::make_shared<ObjectSource>()));
+  res.first->second->header = std::move(objHeader);
+  res.first->second->fullTrackName = fullTrackName_;
+  res.first->second->cancelToken = cancelToken_;
+  newObjects_.enqueue(res.first->second);
 
 
   auto obj_source = std::make_shared<ObjectSource>();
@@ -278,38 +277,38 @@ void MoQSession::TrackHandle::onObjectPayload(
   XLOG(DBG1) << __func__ << " g=" << groupId << " o=" << id
              << " len=" << (payload ? payload->computeChainDataLength() : 0)
              << " eom=" << uint64_t(eom);
-  // auto objIt = objects_.find(std::make_pair(groupId, id));
-  // if (objIt == objects_.end()) {
-  //   // error;
-  //   XLOG(ERR) << "unknown object gid=" << groupId << " seq=" << id;
-  //   return;
-  // }
-  // if (payload) {
-  //   XLOG(DBG1) << "payload enqueued";
-  //   objIt->second->payloadQueue.enqueue(std::move(payload));
-  // }
-  // if (eom) {
-  //   XLOG(DBG1) << "eom enqueued";
-  //   objIt->second->payloadQueue.enqueue(nullptr);
-  // }
-
-  try{
-    auto obj = object_cache_.getWithoutPromotion(std::make_pair(groupId, id));
-    if (obj) {
-      if(payload){
-        XLOG(DBG1) << "payload enqueued";
-        obj->payloadQueue.enqueue(std::move(payload));
-      }
-      if (eom) {
-        XLOG(DBG1) << "eom enqueued";
-        obj->payloadQueue.enqueue(nullptr);
-      }
-    }
-  }
-  catch (const std::exception& ex) {
-    XLOG(ERR) << ex.what();
+  auto objIt = objects_.find(std::make_pair(groupId, id));
+  if (objIt == objects_.end()) {
+    // error;
     XLOG(ERR) << "unknown object gid=" << groupId << " seq=" << id;
+    return;
   }
+  if (payload) {
+    XLOG(DBG1) << "payload enqueued";
+    objIt->second->payloadQueue.enqueue(std::move(payload));
+  }
+  if (eom) {
+    XLOG(DBG1) << "eom enqueued";
+    objIt->second->payloadQueue.enqueue(nullptr);
+  }
+
+  // try{
+  //   auto obj = object_cache_.getWithoutPromotion(std::make_pair(groupId, id));
+  //   if (obj) {
+  //     if(payload){
+  //       XLOG(DBG1) << "payload enqueued";
+  //       obj->payloadQueue.enqueue(std::move(payload));
+  //     }
+  //     if (eom) {
+  //       XLOG(DBG1) << "eom enqueued";
+  //       obj->payloadQueue.enqueue(nullptr);
+  //     }
+  //   }
+  // }
+  // catch (const std::exception& ex) {
+  //   XLOG(ERR) << ex.what();
+  //   XLOG(ERR) << "unknown object gid=" << groupId << " seq=" << id;
+  // }
 }
 
 void MoQSession::onSubscribe(SubscribeRequest subscribeRequest) {
@@ -465,6 +464,8 @@ MoQSession::announce(Announce ann) {
   co_return co_await std::move(contract.second);
 }
 
+
+
 void MoQSession::announceOk(AnnounceOk annOk) {
   XLOG(DBG1) << __func__;
   auto res = writeAnnounceOk(controlWriteBuf_, std::move(annOk));
@@ -480,6 +481,16 @@ void MoQSession::announceError(AnnounceError announceError) {
   auto res = writeAnnounceError(controlWriteBuf_, std::move(announceError));
   if (!res) {
     XLOG(ERR) << "writeAnnounceError failed";
+    return;
+  }
+  controlWriteEvent_.signal();
+}
+
+void MoQSession::unannounce(Unannounce unn) {
+  XLOG(DBG1) << __func__;
+  auto res = writeUnannounce(controlWriteBuf_, std::move(unn));
+  if (!res) {
+    XLOG(ERR) << "writeAnnounceOk failed";
     return;
   }
   controlWriteEvent_.signal();

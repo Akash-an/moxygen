@@ -26,7 +26,7 @@ class MoQRelayAk {
  public:
 
   MoQRelayAk(){
-    harperdb_ = std::make_unique<moxygen::HarperDBQuery>(folly::EventBaseManager::get()->getEventBase());
+    // harperdb_ = std::make_unique<moxygen::HarperDBQuery>(folly::EventBaseManager::get()->getEventBase());
   }
   void setAllowedNamespacePrefix(std::string allowed) {
     allowedNamespacePrefix_ = std::move(allowed);
@@ -34,9 +34,9 @@ class MoQRelayAk {
 
   folly::coro::Task<void> onAnnounce(Announce ann, std::shared_ptr<MoQSession> session);
   folly::coro::Task<void> onSubscribe(SubscribeRequest subReq, std::shared_ptr<MoQSession> session);
-  // folly::coro::Task<void> onUnsubscribe(Unsubscribe unsub, std::shared_ptr<MoQSession> session);
+  folly::coro::Task<void> onUnsubscribe(Unsubscribe unsub, std::shared_ptr<MoQSession> session);
 
-void onUnsubscribe(Unsubscribe unsub, std::shared_ptr<MoQSession> session);
+// void onUnsubscribe(Unsubscribe unsub, std::shared_ptr<MoQSession> session);
 
 
 

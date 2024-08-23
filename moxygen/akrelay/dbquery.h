@@ -23,6 +23,8 @@ namespace moxygen{
 
         folly::coro::Task<void> setHarperDBConnector(){
             XLOG(INFO) << "setHarperDBConnector";
+            if(!evb_)
+                XLOG(ERR) << "setHarperDBConnector: evb_ is nullptr";
             auto dbconnector = std::make_unique<moxygen::HarperDBConnector>(evb_);
             auto httpConnector = std::make_unique<proxygen::HTTPConnector> (&(*dbconnector), proxygen::WheelTimerInstance(std::chrono::milliseconds(5000)));
             folly::StringPiece url_sp(moxygen::DB_URL);
@@ -100,7 +102,7 @@ namespace moxygen{
         req.getHeaders().add("Authorization", "Basic SERCX0FETUlOOnBhc3N3b3Jk");
         req.getHeaders().add("Content-Type", "application/json");
 
-    
+        // for unannounce, irrespective of the originalpublisher field, we want to remove the namespace from this relay; so change the col name accordingly
         std::string whereClause = originalPublisher ? "" : " and originalpublisher = false";
         std::string query = "delete from data.Announces where tracknamespace = '" + tracknamespace + "' and relayid = '" + moxygen::RELAY_ID + "'" + whereClause;
         std::string json_body = "{\"operation\":\"sql\",\"sql\":\"" + query + "\"}";

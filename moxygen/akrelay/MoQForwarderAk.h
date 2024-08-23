@@ -192,6 +192,14 @@ class MoQForwarderAk {
     subscribers_.clear();
   }
 
+  void forwardUnannounce(Unannounce unann) {
+    XLOG(DBG1) << "Forwarder: Unannounce: ";
+    for (auto sub : subscribers_) {
+      sub.session->unannounce(unann);
+    }
+    subscribers_.clear();
+  }
+
  private:
   FullTrackName fullTrackName_;
   folly::F14NodeSet<Subscriber, Subscriber::hash> subscribers_;
