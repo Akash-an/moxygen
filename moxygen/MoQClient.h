@@ -66,7 +66,7 @@ class MoQClient {
     void onWebTransportUniStream(
         proxygen::HTTPCodec::StreamID,
         proxygen::WebTransport::StreamReadHandle* handle) noexcept override {
-      XLOG(INFO) << "onWebTransportUniStream: handler";
+      XLOG(DBG1) << "onWebTransportUniStream: handler";
       session_->onNewUniStream(std::move(handle));
     }
     void onDatagram(std::unique_ptr<folly::IOBuf> datagram) noexcept override {

@@ -26,6 +26,7 @@ folly::coro::Task<void> MoQRelayAk::onAnnounce(Announce ann, std::shared_ptr<MoQ
     // insert into db; ak-todo: error handling: what if insert fails
     auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
     co_await harperdb.executeInsertQuery(ann.trackNamespace, true);
+    first_relay_.emplace(ann.trackNamespace, true);
     announces_.emplace(std::move(ann.trackNamespace), std::move(session));
     XLOG(INFO) << "announced " << ann.trackNamespace; 
     co_return;
@@ -101,6 +102,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       // auto trackNamespaceCopy = subReq.fullTrackName.trackNamespace;
 
       announces_.emplace(subReq.fullTrackName.trackNamespace, std::move(sub_session));
+      first_relay_.emplace(subReq.fullTrackName.trackNamespace, false);
       XLOG(INFO) << "Emplacing namespace: " << subReq.fullTrackName.trackNamespace;
 
       //todo: you can just construct the iterator.. just find out how to.
@@ -218,19 +220,18 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
       
       XLOG(INFO) << "Removing from announces, now len is: " << announces_.size();
       auto ann_it = announces_.find(tracknamespace);
+      
+      //we want to remove only if the upstream session is to a relay
       if (ann_it != announces_.end()) {
-        announces_.erase(ann_it);
+        auto first_relay_it = first_relay_.find(tracknamespace);
+        if (first_relay_it != first_relay_.end()) {
+          if (first_relay_it->second == false){
+            first_relay_.erase(first_relay_it);
+            announces_.erase(ann_it);
+          }
+        }
       }
       XLOG(INFO) << "Removed from announces, now len is: " << announces_.size();
-      // if (!announces_.empty()) {
-      //   for (auto it = announces_.begin(); it != announces_.end();) {
-      //     if (it->first == tracknamespace) {
-      //       it = announces_.erase(it);
-      //     } else {
-      //       it++;
-      //     }
-      //   }
-      // }
       
       XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_.size();
       subscriptionIt = subscriptions_.erase(subscriptionIt);
@@ -288,6 +289,7 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
       remove_from_db = true;
       tracknamespace = it->first;
       it = announces_.erase(it);
+      first_relay_.erase(it->first);
     } else {
       it++;
     }
@@ -370,6 +372,7 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
   auto it = announces_.find(unAnn.trackNamespace);
   if (it != announces_.end()) {
     announces_.erase(it);
+    first_relay_.erase(unAnn.trackNamespace);
   }
 
   // if (subscriptions_.empty()) {
