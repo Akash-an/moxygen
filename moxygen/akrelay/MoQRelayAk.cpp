@@ -292,9 +292,11 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   XLOG(INFO) << "Removing from announces, now len is: " << announces_.size();
   for (auto it = announces_.begin(); it != announces_.end();) {
     if (it->second.get() == session.get()) {
+      XLOG(INFO) << "step 1 ";
       pendingDeletions.insert(it->first);
-      it = announces_.erase(it);
+      XLOG(INFO) << "step 2";
       first_relay_.erase(it->first);
+      it = announces_.erase(it);
     } else {
       it++;
     }

@@ -55,8 +55,8 @@ class MoQRelayClientAk {
   folly::coro::Task<void> run(
       Role role,
       std::vector<moxygen::SubscribeRequest> subs,
-      std::chrono::milliseconds connectTimeout = std::chrono::seconds(5),
-      std::chrono::milliseconds transactionTimeout = std::chrono::seconds(60)) {
+      std::chrono::milliseconds connectTimeout = std::chrono::seconds(60),
+      std::chrono::milliseconds transactionTimeout = std::chrono::seconds(200)) {
     try {
       XLOG(INFO) << "running";
       co_await moqClient_.setupMoQSession(
