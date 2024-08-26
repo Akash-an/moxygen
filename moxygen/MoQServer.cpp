@@ -23,7 +23,7 @@ MoQServer::MoQServer(
   params.serverThreads = 1;
   params.certificateFilePath = cert;
   params.keyFilePath = key;
-  params.txnTimeout = std::chrono::seconds(60);
+  params.txnTimeout = std::chrono::seconds(200);
   hqServer_ = std::make_unique<HQServer>(
       params, [this](HTTPMessage*) { return new Handler(*this); });
   hqServer_->start();
