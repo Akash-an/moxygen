@@ -18,7 +18,7 @@ class MoQRelayClientAk {
   MoQRelayClientAk(
       folly::EventBase* evb,
       proxygen::URL url)
-      : moqClient_(evb, url) {}
+      : moqClient_(evb, url), evb_(evb) {}
 
   ~MoQRelayClientAk() = default;
 
@@ -100,7 +100,7 @@ class MoQRelayClientAk {
       XLOG(INFO) << "running";
       co_await moqClient_.setupMoQSession(
           connectTimeout, transactionTimeout, role);
-      auto exec = co_await folly::coro::co_current_executor;
+      // auto exec = co_await folly::coro::co_current_executor;
       // auto controller = controllerFn_(moqClient_.moqSession_);
       auto controller = std::make_unique<RelayClientControlVisitor>(moqClient_.moqSession_);
 
@@ -109,7 +109,7 @@ class MoQRelayClientAk {
         sessionContract_.first.setException(std::runtime_error("Failed to make controller"));
         co_return folly::makeUnexpected(MoQClientError({-1, "Failed to make controller"}));
       }
-      controlReadLoop(std::move(controller)).scheduleOn(exec).start();
+      controlReadLoop(std::move(controller)).scheduleOn(evb_).start();
       // could parallelize
       if (!moqClient_.moqSession_) {
         XLOG(ERR) << "Session is dead now #sad";
@@ -121,8 +121,9 @@ class MoQRelayClientAk {
       sessionContract_.first.setException(ex);
       co_return folly::makeUnexpected(MoQClientError({-3, ex.what()}));
     }
+    XLOG(INFO) << "returning from MoQRelay Client";
     auto shared_session = moqClient_.moqSession_;
-    co_return std::move(shared_session);
+    co_return shared_session;
     // sessionContract_.first.setValue(moqClient_.moqSession_);
   }
 
@@ -151,6 +152,7 @@ class MoQRelayClientAk {
   std::function<std::unique_ptr<MoQSession::ControlVisitor>(
       std::shared_ptr<MoQSession>)>
       controllerFn_;
+  folly::EventBase* evb_{nullptr};
 };
 
 } // namespace moxygen

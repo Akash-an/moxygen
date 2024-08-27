@@ -74,8 +74,8 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
         co_return;
       }
       
-      // auto relay_url = "https://" + relay_hostname + ":4433/moq";
-      folly::StringPiece url_fw("https://" + relay_hostname + ":4433/moq");
+      auto relay_url = "https://" + relay_hostname + ":4433/moq";
+      folly::StringPiece url_fw(relay_url);
 
       XLOG(DBG1) << "constructed relay url: " << url_fw;
 
@@ -93,7 +93,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
 
       auto sub_session_expected = co_await relay_client_->run(Role::SUBSCRIBER); //.scheduleOn(session->getEventBase()).start();
-      if (sub_session_expected.hasValue()) {
+      if (!sub_session_expected.hasValue()) {
         XLOG(INFO) << "failed to create session";
         co_return;
       }
@@ -295,7 +295,6 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   }
 
   XLOG(INFO) << " Relay removeSession: ";// << session->id;
-  bool remove_from_db = false;
   std::set<std::string> pendingDeletions;
   XLOG(INFO) << "Removing from announces, now len is: " << announces_.size();
   for (auto it = announces_.begin(); it != announces_.end();) {
