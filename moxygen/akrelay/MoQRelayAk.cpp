@@ -92,8 +92,8 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       }
 
 
-      auto sub_session_expected = relay_client_->run(Role::SUBSCRIBER, {subReq}).scheduleOn(session->getEventBase()).start();
-      if (sub_session_expected.hasException()) {
+      auto sub_session_expected = co_await relay_client_->run(Role::SUBSCRIBER); //.scheduleOn(session->getEventBase()).start();
+      if (sub_session_expected.hasValue()) {
         XLOG(INFO) << "failed to create session";
         co_return;
       }

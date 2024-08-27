@@ -94,7 +94,6 @@ class MoQRelayClientAk {
 
   folly::coro::Task<folly::Expected<std::shared_ptr<MoQSession>, MoQClientError>> run(
       Role role,
-      std::vector<moxygen::SubscribeRequest> subs,
       std::chrono::milliseconds connectTimeout = std::chrono::seconds(60),
       std::chrono::milliseconds transactionTimeout = std::chrono::seconds(200)) {
     try {
@@ -123,7 +122,7 @@ class MoQRelayClientAk {
       co_return folly::makeUnexpected(MoQClientError({-3, ex.what()}));
     }
     auto shared_session = moqClient_.moqSession_;
-    co_return shared_session;
+    co_return std::move(shared_session);
     // sessionContract_.first.setValue(moqClient_.moqSession_);
   }
 
