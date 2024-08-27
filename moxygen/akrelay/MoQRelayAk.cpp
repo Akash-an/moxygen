@@ -92,7 +92,11 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       }
 
 
-      auto sub_session = relay_client_->run(Role::SUBSCRIBER, {subReq}).scheduleOn(session->getEventBase()).start();
+      auto sub_session_expected = relay_client_->run(Role::SUBSCRIBER, {subReq}).scheduleOn(session->getEventBase()).start();
+      if (sub_session_expected.hasException()) {
+        XLOG(INFO) << "failed to create session";
+        co_return;
+      }
       XLOG(INFO) << "started a relay client session to peer";      
       // auto sub_session_ftr = co_await co_awaitTry(std::move(relay_client_->sessionContract_.second));
       
@@ -104,7 +108,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       // auto sub_session = std::move(sub_session_ftr.value());
         
       // auto trackNamespaceCopy = subReq.fullTrackName.trackNamespace;
-
+      auto sub_session = std::move(sub_session_expected.value());
       announces_.emplace(subReq.fullTrackName.trackNamespace, std::move(sub_session));
       first_relay_.emplace(subReq.fullTrackName.trackNamespace, false);
       XLOG(INFO) << "Emplacing namespace: " << subReq.fullTrackName.trackNamespace;
