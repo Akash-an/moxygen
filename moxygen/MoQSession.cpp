@@ -348,8 +348,7 @@ void MoQSession::onUnsubscribe(Unsubscribe unsubscribe) {
 
 void MoQSession::onSubscribeOk(SubscribeOk subOk) {
   XLOG(DBG1) << __func__;
-  XLOG(INFO) << setupComplete_;
-      XLOG(INFO) <<"id = " << id;
+  XLOG(INFO) <<"id = " << id;
 
   auto subIt = subTracks_.find(subOk.subscribeID);
   if (subIt == subTracks_.end()) {
@@ -487,7 +486,7 @@ void MoQSession::announceError(AnnounceError announceError) {
 }
 
 void MoQSession::unannounce(Unannounce unn) {
-  XLOG(DBG1) << __func__;
+  XLOG(INFO) << __func__;
   auto res = writeUnannounce(controlWriteBuf_, std::move(unn));
   if (!res) {
     XLOG(ERR) << "writeAnnounceOk failed";

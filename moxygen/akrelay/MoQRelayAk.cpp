@@ -74,30 +74,34 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
         co_return;
       }
       
-      auto relay_url = "https://" + relay_hostname + ":4433/moq";
-
-      folly::StringPiece url_fw(relay_url);
+      // auto relay_url = "https://" + relay_hostname + ":4433/moq";
+      folly::StringPiece url_fw("https://" + relay_hostname + ":4433/moq");
 
       XLOG(DBG1) << "constructed relay url: " << url_fw;
-      auto relay_client_ = std::make_unique<MoQRelayClientAk> (
-          session->getEventBase(),
-          proxygen::URL{url_fw}
-      );
 
-      relay_client_->run(Role::SUBSCRIBER, {subReq}).scheduleOn(session->getEventBase()).start();
-      XLOG(INFO) << "started a relay client session to peer";      
-      auto sub_session_ftr = co_await co_awaitTry(std::move(relay_client_->sessionContract_.second));
-
-      XLOG(INFO) << "successfully scheduled";
-      // auto sub_session = relay_client_->getMoQSession();
-
-      relay_clients_.push_back(std::move(relay_client_));
-      if (sub_session_ftr.hasException()) {
-        XLOG(INFO) << "failed to create session";
-        co_return;
+      std::shared_ptr<MoQRelayClientAk> relay_client_;
+      auto relay_client_it = relay_clients_.find(relay_hostname);
+      if (relay_client_it == relay_clients_.end()) {
+         relay_client_ = std::make_shared<MoQRelayClientAk> (
+            session->getEventBase(),
+            proxygen::URL{url_fw}
+        );
+        relay_clients_.emplace(relay_hostname, relay_client_);
+      } else {
+        relay_client_ = relay_client_it->second;
       }
 
-      auto sub_session = std::move(sub_session_ftr.value());
+
+      auto sub_session = relay_client_->run(Role::SUBSCRIBER, {subReq}).scheduleOn(session->getEventBase()).start();
+      XLOG(INFO) << "started a relay client session to peer";      
+      // auto sub_session_ftr = co_await co_awaitTry(std::move(relay_client_->sessionContract_.second));
+      
+      // if (sub_session_ftr.hasException()) {
+      //   XLOG(INFO) << "failed to create session";
+      //   co_return;
+      // }
+
+      // auto sub_session = std::move(sub_session_ftr.value());
         
       // auto trackNamespaceCopy = subReq.fullTrackName.trackNamespace;
 
