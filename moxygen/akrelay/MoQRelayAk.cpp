@@ -113,7 +113,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       first_relay_.emplace(subReq.fullTrackName.trackNamespace, false);
       XLOG(INFO) << "Emplacing namespace: " << subReq.fullTrackName.trackNamespace;
 
-      //todo: you can just construct the iterator.. just find out how to.
+      
       upstreamSessionIt = announces_.find(subReq.fullTrackName.trackNamespace);      
       if (upstreamSessionIt == announces_.end()){
         XLOG(INFO) << "ITS NULL ";

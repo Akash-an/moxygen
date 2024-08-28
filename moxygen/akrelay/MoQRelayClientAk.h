@@ -48,6 +48,10 @@ class MoQRelayClientAk {
       virtual void operator()(Unannounce unn) const override {
         XLOG(INFO) << "MOQ Client Unannounce ns=" << unn.trackNamespace;
       }
+
+      virtual void operator()(Unsubscribe unsub) const override {
+        XLOG(INFO) << "MoQ Client Unsubscribe id=" << unsub.subscribeID;
+      }
     
 
       private:
@@ -106,19 +110,19 @@ class MoQRelayClientAk {
 
       if (!controller) {
         XLOG(ERR) << "Failed to make controller";
-        sessionContract_.first.setException(std::runtime_error("Failed to make controller"));
+        // sessionContract_.first.setException(std::runtime_error("Failed to make controller"));
         co_return folly::makeUnexpected(MoQClientError({-1, "Failed to make controller"}));
       }
       controlReadLoop(std::move(controller)).scheduleOn(evb_).start();
       // could parallelize
       if (!moqClient_.moqSession_) {
         XLOG(ERR) << "Session is dead now #sad";
-        sessionContract_.first.setException(std::runtime_error("Session is dead now"));
+        // sessionContract_.first.setException(std::runtime_error("Session is dead now"));
         co_return folly::makeUnexpected(MoQClientError({-2, "Session is dead now"}));
       }
     } catch (const std::exception& ex) {
       XLOG(ERR) << ex.what();
-      sessionContract_.first.setException(ex);
+      // sessionContract_.first.setException(ex);
       co_return folly::makeUnexpected(MoQClientError({-3, ex.what()}));
     }
     XLOG(INFO) << "returning from MoQRelay Client";
@@ -127,16 +131,13 @@ class MoQRelayClientAk {
     // sessionContract_.first.setValue(moqClient_.moqSession_);
   }
 
-
-
   std::pair<
           folly::coro::Promise<std::shared_ptr<MoQSession>>,
           folly::coro::Future<std::shared_ptr<MoQSession>>>
           sessionContract_{
               folly::coro::makePromiseContract<std::shared_ptr<MoQSession>>()};
  private:
-  folly::coro::Task<void> controlReadLoop(
-      std::unique_ptr<MoQSession::ControlVisitor> controller) {
+  folly::coro::Task<void> controlReadLoop(std::unique_ptr<MoQSession::ControlVisitor> controller) {
     while (moqClient_.moqSession_) {
       auto msg = co_await moqClient_.moqSession_->controlMessages().next();
       if (!msg) {
@@ -149,10 +150,9 @@ class MoQRelayClientAk {
   }
 
   MoQClient moqClient_;
-  std::function<std::unique_ptr<MoQSession::ControlVisitor>(
-      std::shared_ptr<MoQSession>)>
-      controllerFn_;
+  std::function<std::unique_ptr<MoQSession::ControlVisitor>(std::shared_ptr<MoQSession>)> controllerFn_;
   folly::EventBase* evb_{nullptr};
+  std::unordered_map<std::shared_ptr<MoQSession>, std::shared_ptr<MoQSession>> downstreamSessionMap_;
 };
 
 } // namespace moxygen
