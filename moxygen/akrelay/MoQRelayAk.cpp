@@ -84,6 +84,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
           proxygen::URL{url_fw}
       );
 
+      try {
       relay_client_->run(Role::SUBSCRIBER, {subReq}).scheduleOn(session->getEventBase()).start();
       XLOG(INFO) << "started a relay client session to peer";      
       auto sub_session_ftr = co_await co_awaitTry(std::move(relay_client_->sessionContract_.second));
@@ -91,11 +92,13 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       XLOG(INFO) << "successfully scheduled";
       // auto sub_session = relay_client_->getMoQSession();
 
-      relay_clients_.push_back(std::move(relay_client_));
+      
       if (sub_session_ftr.hasException()) {
         XLOG(INFO) << "failed to create session";
         co_return;
       }
+      relay_clients_.push_back(std::move(relay_client_));
+      
 
       auto sub_session = std::move(sub_session_ftr.value());
         
@@ -115,6 +118,12 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       // auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
       co_await harperdb.executeInsertQuery(subReq.fullTrackName.trackNamespace, false);
       XLOG(INFO) << "added namespace to database for relay";
+
+      }
+      catch (const std::exception& e) {
+        XLOG(ERR) << "in catch block failed to create session";
+        co_return;
+      }
     }
     
     if (session.get() == upstreamSessionIt->second.get()) {
