@@ -123,6 +123,7 @@ class MoQRelayClientAk {
     } catch (const std::exception& ex) {
       XLOG(ERR) << ex.what();
       // sessionContract_.first.setException(ex);
+       XLOG(ERR) << ex.what() << " 2";
       co_return folly::makeUnexpected(MoQClientError({-3, ex.what()}));
     }
     XLOG(INFO) << "returning from MoQRelay Client";

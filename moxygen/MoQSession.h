@@ -261,9 +261,9 @@ class MoQSession : public MoQCodec::Callback {
     folly::coro::UnboundedQueue<std::pair<uint64_t, uint64_t>, true, true>
         objects_order_;
     
-    //used instead of objects_
+    //using this instead of objects_
     folly::EvictingCacheMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>> 
-        object_cache_ = folly::EvictingCacheMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>>(100);
+        object_cache_ = folly::EvictingCacheMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>>(5000);
     
     folly::coro::UnboundedQueue<std::shared_ptr<ObjectSource>, true, true>
         newObjects_;

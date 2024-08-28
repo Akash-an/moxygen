@@ -240,22 +240,22 @@ void MoQSession::onObjectPayload(
 
 void MoQSession::TrackHandle::onObjectHeader(ObjectHeader objHeader) {
   XLOG(DBG1) << __func__;
-  auto res = objects_.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(std::make_pair(objHeader.group, objHeader.id)),
-      std::forward_as_tuple(std::make_shared<ObjectSource>()));
-  res.first->second->header = std::move(objHeader);
-  res.first->second->fullTrackName = fullTrackName_;
-  res.first->second->cancelToken = cancelToken_;
-  newObjects_.enqueue(res.first->second);
+  // auto res = objects_.emplace(
+  //     std::piecewise_construct,
+  //     std::forward_as_tuple(std::make_pair(objHeader.group, objHeader.id)),
+  //     std::forward_as_tuple(std::make_shared<ObjectSource>()));
+  // res.first->second->header = std::move(objHeader);
+  // res.first->second->fullTrackName = fullTrackName_;
+  // res.first->second->cancelToken = cancelToken_;
+  // newObjects_.enqueue(res.first->second);
 
 
-  // auto obj_source = std::make_shared<ObjectSource>();
-  // obj_source->header = std::move(objHeader);
-  // obj_source->fullTrackName = fullTrackName_;
-  // obj_source->cancelToken = cancelToken_;
-  // newObjects_.enqueue(obj_source);
-  // object_cache_.set(std::make_pair(objHeader.group, objHeader.id), std::move(obj_source));
+  auto obj_source = std::make_shared<ObjectSource>();
+  obj_source->header = std::move(objHeader);
+  obj_source->fullTrackName = fullTrackName_;
+  obj_source->cancelToken = cancelToken_;
+  newObjects_.enqueue(obj_source);
+  object_cache_.set(std::make_pair(objHeader.group, objHeader.id), std::move(obj_source));
   
 
 
@@ -277,38 +277,39 @@ void MoQSession::TrackHandle::onObjectPayload(
   XLOG(DBG1) << __func__ << " g=" << groupId << " o=" << id
              << " len=" << (payload ? payload->computeChainDataLength() : 0)
              << " eom=" << uint64_t(eom);
-  auto objIt = objects_.find(std::make_pair(groupId, id));
-  if (objIt == objects_.end()) {
-    // error;
-    XLOG(ERR) << "unknown object gid=" << groupId << " seq=" << id;
-    return;
-  }
-  if (payload) {
-    XLOG(DBG1) << "payload enqueued";
-    objIt->second->payloadQueue.enqueue(std::move(payload));
-  }
-  if (eom) {
-    XLOG(DBG1) << "eom enqueued";
-    objIt->second->payloadQueue.enqueue(nullptr);
-  }
-
-  // try{
-  //   auto obj = object_cache_.getWithoutPromotion(std::make_pair(groupId, id));
-  //   if (obj) {
-  //     if(payload){
-  //       XLOG(DBG1) << "payload enqueued";
-  //       obj->payloadQueue.enqueue(std::move(payload));
-  //     }
-  //     if (eom) {
-  //       XLOG(DBG1) << "eom enqueued";
-  //       obj->payloadQueue.enqueue(nullptr);
-  //     }
-  //   }
-  // }
-  // catch (const std::exception& ex) {
-  //   XLOG(ERR) << ex.what();
+             
+  // auto objIt = objects_.find(std::make_pair(groupId, id));
+  // if (objIt == objects_.end()) {
+  //   // error;
   //   XLOG(ERR) << "unknown object gid=" << groupId << " seq=" << id;
+  //   return;
   // }
+  // if (payload) {
+  //   XLOG(DBG1) << "payload enqueued";
+  //   objIt->second->payloadQueue.enqueue(std::move(payload));
+  // }
+  // if (eom) {
+  //   XLOG(DBG1) << "eom enqueued";
+  //   objIt->second->payloadQueue.enqueue(nullptr);
+  // }
+
+  try{
+    auto obj = object_cache_.getWithoutPromotion(std::make_pair(groupId, id));
+    if (obj) {
+      if(payload){
+        XLOG(DBG1) << "payload enqueued";
+        obj->payloadQueue.enqueue(std::move(payload));
+      }
+      if (eom) {
+        XLOG(DBG1) << "eom enqueued";
+        obj->payloadQueue.enqueue(nullptr);
+      }
+    }
+  }
+  catch (const std::exception& ex) {
+    XLOG(ERR) << ex.what();
+    XLOG(ERR) << "unknown object gid=" << groupId << " seq=" << id;
+  }
 }
 
 void MoQSession::onSubscribe(SubscribeRequest subscribeRequest) {
