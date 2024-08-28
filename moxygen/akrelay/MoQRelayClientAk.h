@@ -90,6 +90,7 @@ class MoQRelayClientAk {
     } catch (const std::exception& ex) {
       XLOG(ERR) << ex.what();
       sessionContract_.first.setException(ex);
+       XLOG(ERR) << ex.what() << " 2";
       co_return; // folly::makeUnexpected(MoQClientError({-3, ex.what()}));
     }
     // auto shared_session = moqClient_.moqSession_;

@@ -22,6 +22,8 @@ namespace moxygen{
 
 
         folly::coro::Task<void> setHarperDBConnector(){
+
+            try{
             XLOG(INFO) << "setHarperDBConnector";
             if(!evb_)
                 XLOG(ERR) << "setHarperDBConnector: evb_ is nullptr";
@@ -38,6 +40,11 @@ namespace moxygen{
             auto session_ftr = co_await co_awaitTry(std::move(dbconnector_->sessionContract.second));
 
             session_ = std::move(session_ftr.value());
+            }
+            catch(std::exception& e){
+                XLOG(ERR) << "setHarperDBConnector: " << e.what();
+                co_return;
+            }
 
         }
 
