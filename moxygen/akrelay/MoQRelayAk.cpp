@@ -41,6 +41,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
   XLOG(INFO) << "onSubscribe IN RELAY_AK";
   auto subscriptionIt = subscriptions_.find(subReq.fullTrackName);
+  std::shared_ptr<MoQRelayClientAk> relay_client_;
   std::shared_ptr<MoQForwarderAk> forwarder;
   if (subscriptionIt == subscriptions_.end()) {
     // first subscriber
@@ -79,7 +80,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
       XLOG(DBG1) << "constructed relay url: " << url_fw;
 
-      std::shared_ptr<MoQRelayClientAk> relay_client_;
+      
       auto relay_client_it = relay_clients_.find(relay_hostname);
       if (relay_client_it == relay_clients_.end()) {
          relay_client_ = std::make_shared<MoQRelayClientAk> (
@@ -154,8 +155,6 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
         token, forwardTrack(subRes.value(), forwarder))
         .scheduleOn(upstreamSessionIt->second->getEventBase())
         .start();
-
-
   } else {
     forwarder = subscriptionIt->second.forwarder;
   }
@@ -164,6 +163,11 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       session, subReq.subscribeID, subReq.trackAlias, subReq);
   session->subscribeOk(
       {subReq.subscribeID, std::chrono::milliseconds(0), forwarder->latest()});
+
+  //todo: add clean up also
+  relay_client_->addDownstreamSession(
+      subscriptions_[subReq.fullTrackName].upstream , session);
+  relay_client_->addUpstreamSessionTracknamespace(session,subReq.fullTrackName.trackNamespace);
 }
 
 folly::coro::Task<void> MoQRelayAk::forwardTrack(

@@ -5,7 +5,9 @@
 # LICENSE file in the root directory of this source tree.
 
 # Relay
-add_library(moqrelayak MoQRelayAk.cpp)
+add_library(moqrelayak 
+    MoQRelayAk.cpp
+    MoQRelayClientAk.cpp)
 target_include_directories(
   moqrelayak PUBLIC
   $<BUILD_INTERFACE:${MOXYGEN_FBCODE_ROOT}>
