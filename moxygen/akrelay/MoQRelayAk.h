@@ -62,11 +62,12 @@ class MoQRelayAk {
   //to remove these?
   //need relay_clients_ to hold on to the life time of the session. is there a better way?
   std::unordered_map<std::string, std::shared_ptr<moxygen::MoQRelayClientAk>> relay_clients_ = {};
-  std::list<std::unique_ptr<proxygen::HTTPConnector>> db_clients_ = {};
+  // std::list<std::unique_ptr<proxygen::HTTPConnector>> db_clients_ = {};
   
   //todo a better way is to keep to seperate annoounce Maps of track--session along with the relay_clients_
   //this stores if the namespace announcement points to a publisher or another relay
   folly::F14FastMap<std::string, bool> first_relay_;
+  folly::F14FastMap<std::string, std::string> next_relay_host_;
 };
 
 } // namespace moxygen

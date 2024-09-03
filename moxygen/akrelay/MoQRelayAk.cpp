@@ -41,9 +41,8 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
   XLOG(INFO) << "onSubscribe IN RELAY_AK";
   auto subscriptionIt = subscriptions_.find(subReq.fullTrackName);
-  std::shared_ptr<MoQRelayClientAk> relay_client_;
+  std::shared_ptr<MoQRelayClientAk> relay_client;
   std::shared_ptr<MoQForwarderAk> forwarder;
-  bool subscribedToAnotherRelay = false;
   if (subscriptionIt == subscriptions_.end()) {
     // first subscriber
 
@@ -69,7 +68,6 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
       auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
       auto relay_hostname = co_await harperdb.getNearestRelay(subReq.fullTrackName.trackNamespace);
-
       
       if (relay_hostname=="") {
         session->subscribeError({subReq.subscribeID, 404, "namespace not found"});
@@ -80,27 +78,26 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       folly::StringPiece url_fw(relay_url);
 
       XLOG(DBG1) << "constructed relay url: " << url_fw;
-
       
       auto relay_client_it = relay_clients_.find(relay_hostname);
       if (relay_client_it == relay_clients_.end()) {
-         relay_client_ = std::make_shared<MoQRelayClientAk> (
+         relay_client = std::make_shared<MoQRelayClientAk> (
             session->getEventBase(),
             proxygen::URL{url_fw}
         );
-        relay_clients_.emplace(relay_hostname, relay_client_);
+        relay_clients_.emplace(relay_hostname, relay_client);
+        next_relay_host_.emplace(subReq.fullTrackName.trackNamespace, relay_hostname);
       } else {
-        relay_client_ = relay_client_it->second;
+        relay_client = relay_client_it->second;
       }
 
-
-      auto sub_session_expected = co_await relay_client_->run(Role::SUBSCRIBER); //.scheduleOn(session->getEventBase()).start();
+      auto sub_session_expected = co_await relay_client->run(Role::SUBSCRIBER); //.scheduleOn(session->getEventBase()).start();
       if (!sub_session_expected.hasValue()) {
         XLOG(INFO) << "failed to create session";
         co_return;
       }
       XLOG(INFO) << "started a relay client session to peer";      
-      // auto sub_session_ftr = co_await co_awaitTry(std::move(relay_client_->sessionContract_.second));
+      // auto sub_session_ftr = co_await co_awaitTry(std::move(relay_client->sessionContract_.second));
       
       // if (sub_session_ftr.hasException()) {
       //   XLOG(INFO) << "failed to create session";
@@ -114,16 +111,13 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       announces_.emplace(subReq.fullTrackName.trackNamespace, std::move(sub_session));
       first_relay_.emplace(subReq.fullTrackName.trackNamespace, false);
       XLOG(INFO) << "Emplacing namespace: " << subReq.fullTrackName.trackNamespace;
-
       
       upstreamSessionIt = announces_.find(subReq.fullTrackName.trackNamespace);      
       if (upstreamSessionIt == announces_.end()){
         XLOG(INFO) << "ITS NULL ";
       }
-      subscribedToAnotherRelay = true;
 
       //add to tracker database
-      // auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
       co_await harperdb.executeInsertQuery(subReq.fullTrackName.trackNamespace, false);
       XLOG(INFO) << "added namespace to database for relay";
     }
@@ -134,7 +128,6 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       co_return;
     }
     XLOG(INFO) <<"namespace exist locally in the announces";
-
 
     //session subscribe
     auto subRes = co_await upstreamSessionIt->second->subscribe(subReq);
@@ -168,11 +161,19 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
   //todo: add clean up also
   //todo: this if block should be removed and sub to origin should also create a new session instead of using the announce's session.
-  if(subscribedToAnotherRelay){
-    relay_client_->addDownstreamSession(
+  if(!first_relay_[subReq.fullTrackName.trackNamespace]){
+    if(!relay_client){
+      auto relay_client_it = relay_clients_.find(next_relay_host_[subReq.fullTrackName.trackNamespace]);
+      if (relay_client_it == relay_clients_.end()) {
+        XLOG(ERR) << "client not found, something is wrong";
+      }
+      relay_client = relay_client_it->second;
+    }
+    relay_client->addDownstreamSession(
         subscriptions_[subReq.fullTrackName].upstream , session);
-    relay_client_->addUpstreamSessionTracknamespace(session,subReq.fullTrackName.trackNamespace);
+    relay_client->addUpstreamSessionTracknamespace(session,subReq.fullTrackName.trackNamespace);
   }
+  XLOG(INFO) <<"MOQRelayAk::onSubscribe end";
 }
 
 folly::coro::Task<void> MoQRelayAk::forwardTrack(

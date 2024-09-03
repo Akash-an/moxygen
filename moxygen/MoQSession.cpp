@@ -553,7 +553,6 @@ void MoQSession::subscribeOk(SubscribeOk subOk) {
 }
 
 void MoQSession::subscribeError(SubscribeError subErr) {
-  auto x=1;
   XLOG(DBG1) << __func__ << subErr.reasonPhrase;
   auto res = writeSubscribeError(controlWriteBuf_, std::move(subErr));
   if (!res) {
