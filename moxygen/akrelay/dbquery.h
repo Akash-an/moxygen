@@ -23,7 +23,7 @@ namespace moxygen{
 
         folly::coro::Task<void> setHarperDBConnector(){
 
-            try{
+            
             XLOG(INFO) << "setHarperDBConnector";
             if(!evb_)
                 XLOG(ERR) << "setHarperDBConnector: evb_ is nullptr";
@@ -32,19 +32,20 @@ namespace moxygen{
             folly::StringPiece url_sp(moxygen::DB_URL);
             proxygen::URL url{url_sp};
             auto sslContext = std::make_shared<folly::SSLContext>();
+            try{
             httpConnector->connectSSL(evb_, folly::SocketAddress(
                                         url.getHost(), url.getPort(), true), sslContext, nullptr, std::chrono::milliseconds(5000));
+            }
+            catch(std::exception& e){
+                XLOG(ERR) << "setHarperDBConnector: " << e.what();
+            }
             // httpConnector->connect(evb_,folly::SocketAddress(
             //             url.getHost(), url.getPort(), true),std::chrono::milliseconds(10000));
             dbconnector_ = std::move(dbconnector);
             auto session_ftr = co_await co_awaitTry(std::move(dbconnector_->sessionContract.second));
 
             session_ = std::move(session_ftr.value());
-            }
-            catch(std::exception& e){
-                XLOG(ERR) << "setHarperDBConnector: " << e.what();
-                co_return;
-            }
+            
 
         }
 
