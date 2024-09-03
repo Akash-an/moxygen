@@ -110,7 +110,7 @@ void MoQSession::setup(ServerSetup setup) {
 }
 
 folly::coro::Task<void> MoQSession::setupComplete() {
-  XLOG(DBG1) << __func__<< "setup complete called";
+  XLOG(DBG1) << __func__<< " called";
   auto deletedToken = cancellationSource_.getToken();
   auto token = co_await folly::coro::co_current_cancellation_token;
   folly::EventBaseThreadTimekeeper tk(*evb_);
@@ -130,7 +130,7 @@ folly::coro::Task<void> MoQSession::setupComplete() {
     close();
     co_yield folly::coro::co_error(std::runtime_error("setup failed"));
   }
-    XLOG(DBG1) << __func__<< " done" << setupComplete_;
+    XLOG(DBG1) << __func__<< " done " << setupComplete_;
 }
 
 folly::coro::AsyncGenerator<MoQSession::MoQMessage>

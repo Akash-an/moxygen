@@ -42,14 +42,13 @@ class MoQRelayClientAk {
   class MoQControlMessageHandler{
 
     public:
-
-    MoQControlMessageHandler(moxygen::MoQRelayClientAk::MoQSessionData& data) : data_(data){}
-
+    MoQControlMessageHandler(moxygen::MoQRelayClientAk::MoQSessionData data) : data_(data){}
+    
     folly::coro::Task<void> onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session);
 
     void addClient(std::shared_ptr<MoQClient> moqClient, std::shared_ptr<MoQSession> session);
 
-    moxygen::MoQRelayClientAk::MoQSessionData& data_;
+    moxygen::MoQRelayClientAk::MoQSessionData data_;
 
   };
 
@@ -199,7 +198,9 @@ class MoQRelayClientAk {
       //add moqClient to the map
 
       auto session = moqClient->moqSession_;
-      controlMessageHandler_.addClient(std::move(moqClient), session);
+      // controlMessageHandler_.addClient(std::move(moqClient), session);
+      XLOG(INFO) << "adding client";
+      controlMessageHandler_.data_.clients_.insert({session, std::move(moqClient)});
       XLOG(INFO) << "returning from MoQRelay Client";
       co_return session;
 
@@ -224,7 +225,7 @@ class MoQRelayClientAk {
   void addDownstreamSession(std::shared_ptr<MoQSession> upstreamsession, std::shared_ptr<MoQSession> downstreamSession);
   void addUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> upstreamSession, std::string trackNamespace);
 
- private:
+//  private:
   folly::coro::Task<void> controlReadLoop(std::shared_ptr<MoQSession> session) {
     auto controller = makeControlVisitor(session);
     while (session) {

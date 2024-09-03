@@ -43,6 +43,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
   auto subscriptionIt = subscriptions_.find(subReq.fullTrackName);
   std::shared_ptr<MoQRelayClientAk> relay_client_;
   std::shared_ptr<MoQForwarderAk> forwarder;
+  bool subscribedToAnotherRelay = false;
   if (subscriptionIt == subscriptions_.end()) {
     // first subscriber
 
@@ -119,6 +120,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       if (upstreamSessionIt == announces_.end()){
         XLOG(INFO) << "ITS NULL ";
       }
+      subscribedToAnotherRelay = true;
 
       //add to tracker database
       // auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
@@ -165,9 +167,12 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       {subReq.subscribeID, std::chrono::milliseconds(0), forwarder->latest()});
 
   //todo: add clean up also
-  relay_client_->addDownstreamSession(
-      subscriptions_[subReq.fullTrackName].upstream , session);
-  relay_client_->addUpstreamSessionTracknamespace(session,subReq.fullTrackName.trackNamespace);
+  //todo: this if block should be removed and sub to origin should also create a new session instead of using the announce's session.
+  if(subscribedToAnotherRelay){
+    relay_client_->addDownstreamSession(
+        subscriptions_[subReq.fullTrackName].upstream , session);
+    relay_client_->addUpstreamSessionTracknamespace(session,subReq.fullTrackName.trackNamespace);
+  }
 }
 
 folly::coro::Task<void> MoQRelayAk::forwardTrack(
