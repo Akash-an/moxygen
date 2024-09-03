@@ -86,7 +86,6 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
             proxygen::URL{url_fw}
         );
         relay_clients_.emplace(relay_hostname, relay_client);
-        next_relay_host_.emplace(subReq.fullTrackName.trackNamespace, relay_hostname);
       } else {
         relay_client = relay_client_it->second;
       }
@@ -111,6 +110,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       announces_.emplace(subReq.fullTrackName.trackNamespace, std::move(sub_session));
       first_relay_.emplace(subReq.fullTrackName.trackNamespace, false);
       XLOG(INFO) << "Emplacing namespace: " << subReq.fullTrackName.trackNamespace;
+      next_relay_host_.emplace(subReq.fullTrackName.trackNamespace, relay_hostname);
       
       upstreamSessionIt = announces_.find(subReq.fullTrackName.trackNamespace);      
       if (upstreamSessionIt == announces_.end()){
