@@ -12,12 +12,12 @@ namespace moxygen {
         auto it = data_->downstreamSessions_.find(session);
         if(it != data_->downstreamSessions_.end()){
             for(auto downstreamSession = it->second.begin(); downstreamSession != it->second.end();){
-                (*downstreamSession)->unannounce(unAnn);
+                (*downstreamSession)->onUnannounce(unAnn);
                 downstreamSession = it->second.erase(downstreamSession);
             }
             data_->downstreamSessions_.erase(it);
         }
-        
+
         co_return;
     }
 

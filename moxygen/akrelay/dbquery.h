@@ -20,14 +20,9 @@ namespace moxygen{
         
         virtual ~HarperDBQuery(){}
 
-
-
         folly::coro::Task<void> setHarperDBConnector(){
 
-            
             XLOG(INFO) << "setHarperDBConnector";
-            if(!evb_)
-                XLOG(ERR) << "setHarperDBConnector: evb_ is nullptr";
             auto dbconnector = std::make_unique<moxygen::HarperDBConnector>(evb_);
             auto httpConnector = std::make_unique<proxygen::HTTPConnector> (&(*dbconnector), proxygen::WheelTimerInstance(std::chrono::milliseconds(5000)));
             folly::StringPiece url_sp(moxygen::DB_URL);

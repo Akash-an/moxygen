@@ -296,6 +296,7 @@ class MoQSession : public MoQCodec::Callback {
 public:
   static int nextid;
 
+  void onUnannounce(Unannounce unannounce) override;
 
  private:
   folly::coro::Task<void> controlWriteLoop(
@@ -325,7 +326,6 @@ public:
   void onAnnounce(Announce announce) override;
   void onAnnounceOk(AnnounceOk announceOk) override;
   void onAnnounceError(AnnounceError announceError) override;
-  void onUnannounce(Unannounce unannounce) override;
   void onAnnounceCancel(AnnounceCancel announceCancel) override;
   void onTrackStatusRequest(TrackStatusRequest trackStatusRequest) override;
   void onTrackStatus(TrackStatus trackStatus) override;

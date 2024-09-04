@@ -80,8 +80,8 @@ class MoQRelayClientAk {
 
     virtual void operator()(Unannounce unn) const override {
       XLOG(INFO) << "MOQ Client Unannounce ns=" << unn.trackNamespace;
-      // controlMessageHandler_.onUnannounce(std::move(unn), clientSession_).scheduleOn(evb_).start();
-      client_.onUnannounce(std::move(unn), clientSession_).scheduleOn(evb_).start();
+      controlMessageHandler_->onUnannounce(std::move(unn), clientSession_).scheduleOn(evb_).start();
+      // client_.onUnannounce(std::move(unn), clientSession_).scheduleOn(evb_).start();
     }
 
     virtual void operator()(Unsubscribe unsub) const override {
