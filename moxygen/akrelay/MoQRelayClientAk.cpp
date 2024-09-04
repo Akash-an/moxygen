@@ -11,21 +11,17 @@ namespace moxygen {
         XLOG(DBG1) << __func__ << unAnn.trackNamespace;
         auto it = data_->downstreamSessions_.find(session);
         if(it != data_->downstreamSessions_.end()){
-            for(auto& downstreamSession : it->second){
-                downstreamSession->unannounce(unAnn);
+            for(auto downstreamSession = it->second.begin(); downstreamSession != it->second.end();){
+                (*downstreamSession)->unannounce(unAnn);
+                downstreamSession = it->second.erase(downstreamSession);
             }
+            data_->downstreamSessions_.erase(it);
         }
-
+        
         co_return;
     }
 
     void MoQRelayClientAk::MoQControlMessageHandler::addClient(std::shared_ptr<MoQClient> moqClient, std::shared_ptr<MoQSession> session){
-        // data_.clients_.emplace(std::move(session), std::move(moqClient));
-        // data_.clients_.emplace(
-        //     std::piecewise_construct,
-        //     std::forward_as_tuple(std::move(session)),
-        //     std::forward_as_tuple(std::move(moqClient))
-        // );
         data_->clients_.insert({session, std::move(moqClient)});
         XLOG(INFO) << __func__ << " clients=" << data_->clients_.size();
     }
@@ -60,5 +56,4 @@ namespace moxygen {
       void MoQRelayClientAk::removeUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> session){
           controlMessageHandler_->data_->upstreamSessionTracknamespace_.erase(session);
       }
-
 }

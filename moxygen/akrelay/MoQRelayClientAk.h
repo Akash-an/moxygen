@@ -13,14 +13,20 @@
 
 #include "moxygen/MoQClient.h"
 
+#include "moxygen/akrelay/dbclient.h"
+#include "moxygen/akrelay/dbquery.h"
+
 namespace moxygen {
 
 class MoQRelayClientAk {
  public:
   MoQRelayClientAk(
       folly::EventBase* evb,
-      proxygen::URL url) : evb_(evb), url_(std::move(url)) {}
-      // : moqClient_(evb, url), evb_(evb) {}
+      proxygen::URL url,
+      std::shared_ptr< folly::F14FastMap<std::string, std::shared_ptr<MoQSession>> > announceMap)
+      // std::shared_ptr<folly::F14FastMap<FullTrackName, moxygen::MoQRelayAk::RelaySubscription, FullTrackName::hash> > subscriptions) 
+        : evb_(evb), url_(std::move(url)), announceMap_(announceMap)/*, subscriptions_(subscriptions)*/ {}
+     
 
   ~MoQRelayClientAk() = default;
 
@@ -57,7 +63,9 @@ class MoQRelayClientAk {
     explicit RelayClientControlVisitor(
         std::shared_ptr<MoQSession> clientSession,
         std::shared_ptr<moxygen::MoQRelayClientAk::MoQControlMessageHandler> controlMessageHandler,
-        folly::EventBase* evb) : clientSession_(clientSession), controlMessageHandler_(controlMessageHandler), evb_(evb) {}
+        folly::EventBase* evb,
+        MoQRelayClientAk& client) 
+          : clientSession_(clientSession), controlMessageHandler_(controlMessageHandler), evb_(evb), client_(client) {}
 
     ~RelayClientControlVisitor() override = default;
 
@@ -73,6 +81,7 @@ class MoQRelayClientAk {
     virtual void operator()(Unannounce unn) const override {
       XLOG(INFO) << "MOQ Client Unannounce ns=" << unn.trackNamespace;
       // controlMessageHandler_.onUnannounce(std::move(unn), clientSession_).scheduleOn(evb_).start();
+      client_.onUnannounce(std::move(unn), clientSession_).scheduleOn(evb_).start();
     }
 
     virtual void operator()(Unsubscribe unsub) const override {
@@ -128,6 +137,7 @@ class MoQRelayClientAk {
     std::shared_ptr<MoQSession> clientSession_;
     std::shared_ptr<moxygen::MoQRelayClientAk::MoQControlMessageHandler> controlMessageHandler_;
     folly::EventBase* evb_;
+    MoQRelayClientAk& client_;
 
     };
 
@@ -224,14 +234,50 @@ class MoQRelayClientAk {
   }
 
   std::unique_ptr<MoQSession::ControlVisitor> makeControlVisitor(std::shared_ptr<MoQSession> session) {
-    auto controller = std::make_unique<MoQRelayClientAk::RelayClientControlVisitor>(session, controlMessageHandler_, evb_);
+    auto controller = std::make_unique<MoQRelayClientAk::RelayClientControlVisitor>(session, controlMessageHandler_, evb_, *this);
     return controller;
   }
+
+  folly::coro::Task<void> onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session){
+    XLOG(INFO) << "MoQRelayClientAk onUnannounce: " << unAnn.trackNamespace;
+
+    auto it = announceMap_->find(unAnn.trackNamespace);
+    if (it != announceMap_->end()) {
+      announceMap_->erase(it);
+      // first_relay_.erase(unAnn.trackNamespace);
+    }
+
+    // for (auto it = subscriptions_->begin(); it != subscriptions_->end();) {
+    //   if (it->first.trackNamespace == unAnn.trackNamespace) {
+        
+    //     auto subscription = it->second;
+    //     subscription.cancellationSource.requestCancellation();
+
+    //     //send unannounce to subscribers
+    //     subscription.forwarder->forwardUnannounce(unAnn);
+        
+    //     XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_->size();
+    //     it = subscriptions_->erase(it);
+    //     XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_->size();
+    //   } else {
+    //     it++;
+    //   }
+    // }
+
+    XLOG(INFO) << "Removing from database";
+    auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+    co_await harperdb.executeDeleteQuery(unAnn.trackNamespace, true);
+    XLOG(INFO) << "removed from database";
+  }
+
 
   // MoQClient moqClient_;
   // std::function<std::unique_ptr<MoQSession::ControlVisitor>(std::shared_ptr<MoQSession>)> controllerFn_;
   folly::EventBase* evb_{nullptr};
   proxygen::URL url_;
+
+  std::shared_ptr< folly::F14FastMap<std::string, std::shared_ptr<MoQSession>> > announceMap_;
+  // std::shared_ptr<folly::F14FastMap<FullTrackName, moxygen::MoQRelayAk::RelaySubscription, FullTrackName::hash> > subscriptions_;
 
   std::shared_ptr<MoQSessionData> sessionData_ = std::make_shared<MoQSessionData>();
   std::shared_ptr<MoQControlMessageHandler> controlMessageHandler_ = std::make_shared<MoQControlMessageHandler>(sessionData_);

@@ -80,10 +80,14 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       XLOG(DBG1) << "constructed relay url: " << url_fw;
       
       auto relay_client_it = relay_clients_.find(relay_hostname);
+      auto announces_ptr = std::make_shared<folly::F14FastMap<std::string, std::shared_ptr<MoQSession>>>(announces_);
+      auto subs_ptr = std::make_shared<folly::F14FastMap<FullTrackName, moxygen::MoQRelayAk::RelaySubscription, FullTrackName::hash>>(subscriptions_);
+      
       if (relay_client_it == relay_clients_.end()) {
          relay_client = std::make_shared<MoQRelayClientAk> (
             session->getEventBase(),
-            proxygen::URL{url_fw}
+            proxygen::URL{url_fw},
+            std::move(announces_ptr)
         );
         relay_clients_.emplace(relay_hostname, relay_client);
       } else {

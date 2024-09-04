@@ -37,21 +37,22 @@ class MoQRelayAk {
 
 // void onUnsubscribe(Unsubscribe unsub, std::shared_ptr<MoQSession> session);
 
-
-
   folly::coro::Task<void> onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session);
   folly::coro::Task<void> onSubscribeDone(SubscribeDone subscribeDone, std::shared_ptr<MoQSession> session);
 
   void removeSession(const std::shared_ptr<MoQSession>& session);
 
   std::unique_ptr<moxygen::HarperDBQuery> harperdb_{nullptr};
- private:
+
   struct RelaySubscription {
     std::shared_ptr<MoQForwarderAk> forwarder;
     std::shared_ptr<MoQSession> upstream;
     uint64_t subscribeID;
     folly::CancellationSource cancellationSource;
   };
+  
+ private:
+  
   folly::coro::Task<void> forwardTrack(
       std::shared_ptr<MoQSession::TrackHandle> track,
       std::shared_ptr<MoQForwarderAk> forwarder);
@@ -61,7 +62,9 @@ class MoQRelayAk {
   folly::F14FastMap<FullTrackName, RelaySubscription, FullTrackName::hash> subscriptions_;
   //to remove these?
   //need relay_clients_ to hold on to the life time of the session. is there a better way?
+  // map of hostname to relay client
   std::unordered_map<std::string, std::shared_ptr<moxygen::MoQRelayClientAk>> relay_clients_ = {};
+  // map of trackname to relay hostname
   std::unordered_map<std::string, std::string> next_relay_host_;
   // std::list<std::unique_ptr<proxygen::HTTPConnector>> db_clients_ = {};
   

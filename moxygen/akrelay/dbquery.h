@@ -7,6 +7,7 @@
 
 #include "RelayGlobalVars.h"
 
+#pragma once
 
 namespace moxygen{
 
