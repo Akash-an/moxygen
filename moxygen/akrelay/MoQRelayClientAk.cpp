@@ -17,8 +17,9 @@ namespace moxygen {
                 }
                 downstreamSession = it->second.erase(downstreamSession);
             }
-            //data erase happens in the server unannounce through removesession
-            // data_->downstreamSessions_.erase(it);
+            XLOG(INFO) << __func__ << " sessions size=" << data_->downstreamSessions_.size();
+            data_->downstreamSessions_.erase(it);
+            XLOG(INFO) << __func__ << " sessions size=" << data_->downstreamSessions_.size();
         }
     }
 

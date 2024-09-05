@@ -412,28 +412,16 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
     }
   }
 
-  //print contents of next_relay_host_
-  for (auto it = next_relay_host_.begin(); it != next_relay_host_.end();) {
-    XLOG(INFO) << "next_relay_host_" << it->first << ": " << it->second;
-    it++;
-  }
-
-  XLOG(INFO) << "RelayAK onUnannounce: next_relay_host_ size: " << next_relay_host_.size();
-  for(auto& it : next_relay_host_) {
-      XLOG(INFO) << it.first<< ": " << it.second;
-    }
-
   //remove the session from relay_clients
   XLOG(INFO) << "RelayAK onUnannounce: removing from relay_clients";
-  auto hostname = next_relay_host_[unAnn.trackNamespace];
-  auto relay_client_it = relay_clients_.find(hostname);
-  if (relay_client_it != relay_clients_.end()) {
-    XLOG(INFO) << "we are here!!!";
-    relay_client_it->second->removeSessionFromData(session);
+  auto hostname_it = next_relay_host_.find(unAnn.trackNamespace);
+  if (hostname_it != next_relay_host_.end()) {
+    auto relay_client_it = relay_clients_.find(hostname_it->second);
+    if (relay_client_it != relay_clients_.end()) {
+      relay_client_it->second->removeSessionFromData(session);
+    }
+    next_relay_host_.erase(unAnn.trackNamespace);
   }
-  XLOG(INFO) << "RelayAK onUnannounce: next_relay_host_ size: " << next_relay_host_.size();
-  next_relay_host_.erase(unAnn.trackNamespace);
-  XLOG(INFO) << "RelayAK onUnannounce: removed from next_relay_host_ size: " << next_relay_host_.size();
 
   XLOG(INFO) << "Removing from database";
   auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
