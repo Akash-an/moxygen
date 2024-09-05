@@ -6,19 +6,21 @@
 
 namespace moxygen {
 
-    folly::coro::Task<void> MoQRelayClientAk::MoQControlMessageHandler::onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session)
+    void MoQRelayClientAk::MoQControlMessageHandler::onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session)
     {
         XLOG(DBG1) << __func__ << unAnn.trackNamespace;
         auto it = data_->downstreamSessions_.find(session);
         if(it != data_->downstreamSessions_.end()){
             for(auto downstreamSession = it->second.begin(); downstreamSession != it->second.end();){
-                (*downstreamSession)->onUnannounce(unAnn);
+                if((*downstreamSession)) {
+                    (*downstreamSession)->onUnannounce(unAnn);
+                }
                 downstreamSession = it->second.erase(downstreamSession);
             }
-            data_->downstreamSessions_.erase(it);
+            //data erase happens in the server unannounce through removesession
+            // data_->downstreamSessions_.erase(it);
         }
-
-        co_return;
+        // data_->clients_.erase(session);
     }
 
     void MoQRelayClientAk::MoQControlMessageHandler::addClient(std::shared_ptr<MoQClient> moqClient, std::shared_ptr<MoQSession> session){
@@ -44,16 +46,28 @@ namespace moxygen {
         XLOG(INFO) << __func__ << " sessions size=" << controlMessageHandler_->data_->downstreamSessions_.size();
     }
 
-      void MoQRelayClientAk::removeSessionFromDownstreamMap(std::shared_ptr<MoQSession> session){
+    void MoQRelayClientAk::removeSessionFromData(std::shared_ptr<MoQSession> session){
+        XLOG(INFO) << __func__ << " sessions size=" << controlMessageHandler_->data_->downstreamSessions_.size();
         controlMessageHandler_->data_->downstreamSessions_.erase(session);
-      }
+        XLOG(INFO) << __func__ << " sessions size=" << controlMessageHandler_->data_->downstreamSessions_.size();
 
-    void MoQRelayClientAk::addUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> upstreamSession, std::string trackNamespace){
-        controlMessageHandler_->data_->upstreamSessionTracknamespace_[upstreamSession] = std::move(trackNamespace);
-        XLOG(INFO) << __func__ << " session tracks size=" << controlMessageHandler_->data_->upstreamSessionTracknamespace_.size();
+        XLOG(INFO) << __func__ << " clients size=" << controlMessageHandler_->data_->clients_.size();
+        controlMessageHandler_->data_->clients_.erase(session);
+        XLOG(INFO) << __func__ << " clients size=" << controlMessageHandler_->data_->clients_.size();
     }
 
-      void MoQRelayClientAk::removeUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> session){
-          controlMessageHandler_->data_->upstreamSessionTracknamespace_.erase(session);
-      }
+    void MoQRelayClientAk::removeDownstreamSessionFromData(std::shared_ptr<MoQSession> session){
+        for(auto it = controlMessageHandler_->data_->downstreamSessions_.begin(); it != controlMessageHandler_->data_->downstreamSessions_.end();){
+            it->second.erase(session);
+        }
+    }
+
+    // void MoQRelayClientAk::addUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> upstreamSession, std::string trackNamespace){
+    //     controlMessageHandler_->data_->upstreamSessionTracknamespace_[upstreamSession] = std::move(trackNamespace);
+    //     XLOG(INFO) << __func__ << " session tracks size=" << controlMessageHandler_->data_->upstreamSessionTracknamespace_.size();
+    // }
+
+    //   void MoQRelayClientAk::removeUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> session){
+    //       controlMessageHandler_->data_->upstreamSessionTracknamespace_.erase(session);
+    //   }
 }

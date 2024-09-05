@@ -60,12 +60,14 @@ class MoQRelayAk {
   std::string allowedNamespacePrefix_;
   folly::F14FastMap<std::string, std::shared_ptr<MoQSession>> announces_;
   folly::F14FastMap<FullTrackName, RelaySubscription, FullTrackName::hash> subscriptions_;
-  //to remove these?
+
   //need relay_clients_ to hold on to the life time of the session. is there a better way?
   // map of hostname to relay client
   std::unordered_map<std::string, std::shared_ptr<moxygen::MoQRelayClientAk>> relay_clients_ = {};
   // map of trackname to relay hostname
   std::unordered_map<std::string, std::string> next_relay_host_;
+  // map of session to relay client -- need this to look up the relay client
+  std::unordered_map<std::shared_ptr<MoQSession>, std::shared_ptr<moxygen::MoQRelayClientAk>> session_relay_clients_ = {};
   // std::list<std::unique_ptr<proxygen::HTTPConnector>> db_clients_ = {};
   
   //todo a better way is to keep to seperate annoounce Maps of track--session along with the relay_clients_

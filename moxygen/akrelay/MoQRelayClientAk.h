@@ -22,10 +22,8 @@ class MoQRelayClientAk {
  public:
   MoQRelayClientAk(
       folly::EventBase* evb,
-      proxygen::URL url,
-      std::shared_ptr< folly::F14FastMap<std::string, std::shared_ptr<MoQSession>> > announceMap)
-      // std::shared_ptr<folly::F14FastMap<FullTrackName, moxygen::MoQRelayAk::RelaySubscription, FullTrackName::hash> > subscriptions) 
-        : evb_(evb), url_(std::move(url)), announceMap_(announceMap)/*, subscriptions_(subscriptions)*/ {}
+      proxygen::URL url)
+        : evb_(evb), url_(std::move(url)){}
      
 
   ~MoQRelayClientAk() = default;
@@ -37,10 +35,12 @@ class MoQRelayClientAk {
   
   class MoQSessionData {
     public:
+    //unordered map of upstream session and their downstream sessions
     std::unordered_map<std::shared_ptr<MoQSession>, std::set<std::shared_ptr<MoQSession>> > downstreamSessions_;
-    std::unordered_map<std::shared_ptr<MoQSession>, std::string> upstreamSessionTracknamespace_;
-
     
+    //unordered map of upstream session and its track namespace
+    // std::unordered_map<std::shared_ptr<MoQSession>, std::string> upstreamSessionTracknamespace_;
+
     //unordered map of client sessions and their clients
     std::unordered_map<std::shared_ptr<MoQSession>, std::shared_ptr<MoQClient> > clients_;
   };
@@ -50,7 +50,7 @@ class MoQRelayClientAk {
     public:
     MoQControlMessageHandler(std::shared_ptr<moxygen::MoQRelayClientAk::MoQSessionData> data) : data_(data){}
     
-    folly::coro::Task<void> onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session);
+    void onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session);
 
     void addClient(std::shared_ptr<MoQClient> moqClient, std::shared_ptr<MoQSession> session);
 
@@ -63,9 +63,8 @@ class MoQRelayClientAk {
     explicit RelayClientControlVisitor(
         std::shared_ptr<MoQSession> clientSession,
         std::shared_ptr<moxygen::MoQRelayClientAk::MoQControlMessageHandler> controlMessageHandler,
-        folly::EventBase* evb,
-        MoQRelayClientAk& client) 
-          : clientSession_(clientSession), controlMessageHandler_(controlMessageHandler), evb_(evb), client_(client) {}
+        folly::EventBase* evb) 
+          : clientSession_(clientSession), controlMessageHandler_(controlMessageHandler), evb_(evb) {}
 
     ~RelayClientControlVisitor() override = default;
 
@@ -80,7 +79,7 @@ class MoQRelayClientAk {
 
     virtual void operator()(Unannounce unn) const override {
       XLOG(INFO) << "MOQ Client Unannounce ns=" << unn.trackNamespace;
-      controlMessageHandler_->onUnannounce(std::move(unn), clientSession_).scheduleOn(evb_).start();
+      controlMessageHandler_->onUnannounce(std::move(unn), clientSession_);
       // client_.onUnannounce(std::move(unn), clientSession_).scheduleOn(evb_).start();
     }
 
@@ -137,8 +136,6 @@ class MoQRelayClientAk {
     std::shared_ptr<MoQSession> clientSession_;
     std::shared_ptr<moxygen::MoQRelayClientAk::MoQControlMessageHandler> controlMessageHandler_;
     folly::EventBase* evb_;
-    MoQRelayClientAk& client_;
-
     };
 
 
@@ -214,6 +211,7 @@ class MoQRelayClientAk {
  
   void addDownstreamSession(std::shared_ptr<MoQSession> upstreamsession, std::shared_ptr<MoQSession> downstreamSession);
   void removeSessionFromDownstreamMap(std::shared_ptr<MoQSession> session);
+  void removeDownstreamSessionFromData(std::shared_ptr<MoQSession> session);
   void addUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> upstreamSession, std::string trackNamespace);
   void removeUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> session);
   void removeSessionFromData(std::shared_ptr<MoQSession> session);
@@ -238,37 +236,37 @@ class MoQRelayClientAk {
     return controller;
   }
 
-  folly::coro::Task<void> onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session){
-    XLOG(INFO) << "MoQRelayClientAk onUnannounce: " << unAnn.trackNamespace;
+  // folly::coro::Task<void> onUnannounce(Unannounce unAnn, std::shared_ptr<MoQSession> session){
+  //   XLOG(INFO) << "MoQRelayClientAk onUnannounce: " << unAnn.trackNamespace;
 
-    auto it = announceMap_->find(unAnn.trackNamespace);
-    if (it != announceMap_->end()) {
-      announceMap_->erase(it);
-      // first_relay_.erase(unAnn.trackNamespace);
-    }
+  //   auto it = announceMap_->find(unAnn.trackNamespace);
+  //   if (it != announceMap_->end()) {
+  //     announceMap_->erase(it);
+  //     // first_relay_.erase(unAnn.trackNamespace);
+  //   }
 
-    // for (auto it = subscriptions_->begin(); it != subscriptions_->end();) {
-    //   if (it->first.trackNamespace == unAnn.trackNamespace) {
+  //   // for (auto it = subscriptions_->begin(); it != subscriptions_->end();) {
+  //   //   if (it->first.trackNamespace == unAnn.trackNamespace) {
         
-    //     auto subscription = it->second;
-    //     subscription.cancellationSource.requestCancellation();
+  //   //     auto subscription = it->second;
+  //   //     subscription.cancellationSource.requestCancellation();
 
-    //     //send unannounce to subscribers
-    //     subscription.forwarder->forwardUnannounce(unAnn);
+  //   //     //send unannounce to subscribers
+  //   //     subscription.forwarder->forwardUnannounce(unAnn);
         
-    //     XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_->size();
-    //     it = subscriptions_->erase(it);
-    //     XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_->size();
-    //   } else {
-    //     it++;
-    //   }
-    // }
+  //   //     XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_->size();
+  //   //     it = subscriptions_->erase(it);
+  //   //     XLOG(INFO) << "removed from subscriptions, now len is: " << subscriptions_->size();
+  //   //   } else {
+  //   //     it++;
+  //   //   }
+  //   // }
 
-    XLOG(INFO) << "Removing from database";
-    auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
-    co_await harperdb.executeDeleteQuery(unAnn.trackNamespace, true);
-    XLOG(INFO) << "removed from database";
-  }
+  //   XLOG(INFO) << "Removing from database";
+  //   auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
+  //   co_await harperdb.executeDeleteQuery(unAnn.trackNamespace, true);
+  //   XLOG(INFO) << "removed from database";
+  // }
 
 
   // MoQClient moqClient_;
@@ -276,7 +274,7 @@ class MoQRelayClientAk {
   folly::EventBase* evb_{nullptr};
   proxygen::URL url_;
 
-  std::shared_ptr< folly::F14FastMap<std::string, std::shared_ptr<MoQSession>> > announceMap_;
+  // std::shared_ptr< folly::F14FastMap<std::string, std::shared_ptr<MoQSession>> > announceMap_;
   // std::shared_ptr<folly::F14FastMap<FullTrackName, moxygen::MoQRelayAk::RelaySubscription, FullTrackName::hash> > subscriptions_;
 
   std::shared_ptr<MoQSessionData> sessionData_ = std::make_shared<MoQSessionData>();

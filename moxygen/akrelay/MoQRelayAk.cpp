@@ -80,14 +80,13 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       XLOG(DBG1) << "constructed relay url: " << url_fw;
       
       auto relay_client_it = relay_clients_.find(relay_hostname);
-      auto announces_ptr = std::make_shared<folly::F14FastMap<std::string, std::shared_ptr<MoQSession>>>(announces_);
-      auto subs_ptr = std::make_shared<folly::F14FastMap<FullTrackName, moxygen::MoQRelayAk::RelaySubscription, FullTrackName::hash>>(subscriptions_);
+      // auto announces_ptr = std::make_shared<folly::F14FastMap<std::string, std::shared_ptr<MoQSession>>>(announces_);
+      // auto subs_ptr = std::make_shared<folly::F14FastMap<FullTrackName, moxygen::MoQRelayAk::RelaySubscription, FullTrackName::hash>>(subscriptions_);
       
       if (relay_client_it == relay_clients_.end()) {
          relay_client = std::make_shared<MoQRelayClientAk> (
             session->getEventBase(),
-            proxygen::URL{url_fw},
-            std::move(announces_ptr)
+            proxygen::URL{url_fw}
         );
         relay_clients_.emplace(relay_hostname, relay_client);
       } else {
@@ -100,17 +99,10 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
         co_return;
       }
       XLOG(INFO) << "started a relay client session to peer";      
-      // auto sub_session_ftr = co_await co_awaitTry(std::move(relay_client->sessionContract_.second));
-      
-      // if (sub_session_ftr.hasException()) {
-      //   XLOG(INFO) << "failed to create session";
-      //   co_return;
-      // }
 
-      // auto sub_session = std::move(sub_session_ftr.value());
         
-      // auto trackNamespaceCopy = subReq.fullTrackName.trackNamespace;
       auto sub_session = std::move(sub_session_expected.value());
+      session_relay_clients_.emplace(sub_session, relay_client);
       announces_.emplace(subReq.fullTrackName.trackNamespace, std::move(sub_session));
       first_relay_.emplace(subReq.fullTrackName.trackNamespace, false);
       XLOG(INFO) << "Emplacing namespace: " << subReq.fullTrackName.trackNamespace;
@@ -164,7 +156,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       {subReq.subscribeID, std::chrono::milliseconds(0), forwarder->latest()});
 
   //todo: add clean up also
-  //todo: this if block should be removed and sub to origin should also create a new session instead of using the announce's session.
+  //todo: this if block should be removed and subscription to origin should also create a new session instead of using the announce's session.
   if(!first_relay_[subReq.fullTrackName.trackNamespace]){
     if(!relay_client){
       auto relay_client_it = relay_clients_.find(next_relay_host_[subReq.fullTrackName.trackNamespace]);
@@ -240,6 +232,18 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
       pendingDeletions.insert(subscriptionIt->first.trackNamespace);
       //forward the unsubscribe to the upstream publisher
       subscription.upstream->unsubscribe(Unsubscribe{subscription.subscribeID});
+
+      //removing upstream session from relay client
+      auto relay_it = session_relay_clients_.find(subscription.upstream);
+      if (relay_it != session_relay_clients_.end()) {
+        relay_it->second->removeSessionFromData(subscription.upstream);
+      }
+      XLOG(INFO) << "removing from session_relay_clients_, now len is: " << session_relay_clients_.size();
+      session_relay_clients_.erase(subscription.upstream);
+      XLOG(INFO) << "removed from session_relay_clients_, now len is: " << session_relay_clients_.size();
+      XLOG(INFO) << "removing from next_relay_host_, now len is: " << next_relay_host_.size();
+      next_relay_host_.erase(subscriptionIt->first.trackNamespace);
+      XLOG(INFO) << "removed from next_relay_host_, now len is: " << next_relay_host_.size();
           
       XLOG(INFO) << "removing from subscriptions, now len is: " << subscriptions_.size();
       subscriptionIt = subscriptions_.erase(subscriptionIt);
@@ -249,6 +253,16 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
       subscriptionIt++;
     }
   }
+
+  //removing downstream session from relay client
+  auto relay_it = session_relay_clients_.find(session);
+  if (relay_it != session_relay_clients_.end()) {
+    relay_it->second->removeDownstreamSessionFromData(session);
+  }
+  XLOG(INFO) << "removing from session_relay_clients_, now len is: " << session_relay_clients_.size();
+  session_relay_clients_.erase(session);
+  XLOG(INFO) << "removed from session_relay_clients_, now len is: " << session_relay_clients_.size();
+
 
   //we want to remove the announces added during subscription
   XLOG(INFO) << "pending deletions size: " << pendingDeletions.size();
@@ -274,7 +288,6 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
     XLOG(DBG1) << "Removing from database: " << tracknamespace;
     co_await harperdb.executeDeleteQuery(tracknamespace, false);
   }
-  
 }
 
 
@@ -304,11 +317,11 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   // TODO: remove linear search
   if (!session) {
     //necessary as it is called on transport error as well;
-    XLOG (INFO) << "Relay removeSession: no session.. why are we here?";
+    XLOG (INFO) << "Relay removeSession: no session to remove";
     return;
   }
 
-  XLOG(INFO) << " Relay removeSession: ";// << session->id;
+  XLOG(INFO) << " Relay removeSession: ";
   std::set<std::string> pendingDeletions;
   XLOG(INFO) << "Removing from announces, now len is: " << announces_.size();
   for (auto it = announces_.begin(); it != announces_.end();) {
@@ -370,6 +383,18 @@ void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
     }
   }
 
+  //remove the session from moqClient
+  XLOG(INFO) << "Relay removeSession: removing from moqClient " << pendingDeletions.size();
+  auto relay_it = session_relay_clients_.find(session);
+  if (relay_it != session_relay_clients_.end()) {
+    auto relay = relay_it->second;
+    relay->removeSessionFromData(session);
+    relay->removeDownstreamSessionFromData(session);
+    XLOG(INFO) << "Relay removeSession: removing from session_relay_clients_, now len is: " << session_relay_clients_.size();
+    session_relay_clients_.erase(session);
+    XLOG(INFO) << "Relay removeSession: removed from session_relay_clients_, now len is: " << session_relay_clients_.size();
+  }
+
   XLOG(INFO) << "Relay removeSession: pendingDeletions size: " << pendingDeletions.size();
   harperdb_ = std::make_unique<moxygen::HarperDBQuery>(folly::EventBaseManager::get()->getEventBase());
   for (const auto& tracknamespace : pendingDeletions) {
@@ -409,6 +434,14 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
       it++;
     }
   }
+
+  //remove the session from relay_clients
+  XLOG(INFO) << "RelayAK onUnannounce: removing from relay_clients";
+  auto relay_client_it = relay_clients_.find(next_relay_host_[unAnn.trackNamespace]);
+  if (relay_client_it != relay_clients_.end()) {
+    relay_client_it->second->removeSessionFromData(session);
+  }
+  next_relay_host_.erase(unAnn.trackNamespace);
 
   XLOG(DBG1) << "Removing from database";
   auto harperdb = moxygen::HarperDBQuery(session->getEventBase());
