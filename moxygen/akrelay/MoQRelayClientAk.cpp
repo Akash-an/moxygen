@@ -50,7 +50,11 @@ namespace moxygen {
         XLOG(INFO) << __func__ << " sessions size=" << controlMessageHandler_->data_->downstreamSessions_.size();
         controlMessageHandler_->data_->downstreamSessions_.erase(session);
         XLOG(INFO) << __func__ << " sessions size=" << controlMessageHandler_->data_->downstreamSessions_.size();
+    }
 
+    void MoQRelayClientAk::removeSessionClient(std::shared_ptr<MoQSession> session){
+        //call this only if you are sure the session is cleaned up; 
+        // otherwise the handler won't exist and you'll end up with sengmentation fault
         XLOG(INFO) << __func__ << " clients size=" << controlMessageHandler_->data_->clients_.size();
         controlMessageHandler_->data_->clients_.erase(session);
         XLOG(INFO) << __func__ << " clients size=" << controlMessageHandler_->data_->clients_.size();

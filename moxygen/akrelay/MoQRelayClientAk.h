@@ -215,6 +215,7 @@ class MoQRelayClientAk {
   void addUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> upstreamSession, std::string trackNamespace);
   void removeUpstreamSessionTracknamespace(std::shared_ptr<MoQSession> session);
   void removeSessionFromData(std::shared_ptr<MoQSession> session);
+  void removeSessionClient(std::shared_ptr<MoQSession> session);
   
 
 //  private:

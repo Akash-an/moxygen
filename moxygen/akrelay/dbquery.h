@@ -15,7 +15,6 @@ namespace moxygen{
     public:
         HarperDBQuery(folly::EventBase* evb): evb_(evb){
             XLOG(INFO) << "HarperDBQuery";
-
         }
         
         virtual ~HarperDBQuery(){}

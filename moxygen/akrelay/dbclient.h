@@ -53,16 +53,16 @@ public:
         }
 
         void detachTransaction() noexcept override {
-            XLOG(INFO) << "detachTransaction";
+            XLOG(INFO) << "Harper db detachTransaction";
             txn_ = nullptr;
         }
 
         void onHeadersComplete(std::unique_ptr<proxygen::HTTPMessage> msg) noexcept override {
-            XLOG(INFO) << "onHeadersComplete";
+            XLOG(INFO) << "harperdb onHeadersComplete";
         }
 
         void onBody(std::unique_ptr<folly::IOBuf> resp) noexcept override {
-            XLOG(INFO) << "Body: " ;
+            XLOG(INFO) << "harperdb onBody: " ;
             // XLOG(INFO) << resp->moveToFbString().toStdString();
             // XLOG(INFO) << resp->moveToFbString().toStdString();
             
@@ -70,23 +70,23 @@ public:
         }
 
         void onUpgrade(proxygen::UpgradeProtocol protocol) noexcept override {
-            XLOG(INFO) << "onUpgrade";
+            XLOG(INFO) << "harper db onUpgrade";
         }
 
         void onTrailers(std::unique_ptr<proxygen::HTTPHeaders>) noexcept override {
-            XLOG(INFO) << "onTrailers";
+            XLOG(INFO) << "harper db onTrailers";
         }
 
         void onEgressPaused() noexcept override {
-            XLOG(INFO) << "onEgressPaused";
+            XLOG(INFO) << "harper db onEgressPaused";
         }
 
         void onEgressResumed() noexcept override {
-            XLOG(INFO) << "onEgressResumed";
+            XLOG(INFO) << "harper db onEgressResumed";
         }
 
         void onEOM() noexcept override {
-            XLOG(INFO) << "onEOM";
+            XLOG(INFO) << "harper db onEOM";
             std::string collectedBody;
             auto combinedBuffer = resp_.move();
 
@@ -107,13 +107,14 @@ public:
             }
 
             responseContract_.first.setValue(collectedBody);
-
             eomContract_.first.setValue(0);
         }
 
         void onError(const proxygen::HTTPException& ex) noexcept override {
-            XLOG(INFO) << "onError: " << ex.what();
+            XLOG(INFO) << "harper db onError: " << ex.what();
         }
+
+        // void onWebTransportUniStream
 
         HarperDBConnector& db_;
         proxygen::HTTPTransaction* txn_{nullptr};

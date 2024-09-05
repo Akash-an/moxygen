@@ -84,12 +84,15 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       // auto subs_ptr = std::make_shared<folly::F14FastMap<FullTrackName, moxygen::MoQRelayAk::RelaySubscription, FullTrackName::hash>>(subscriptions_);
       
       if (relay_client_it == relay_clients_.end()) {
+        XLOG(INFO) << "creating new relay client";
          relay_client = std::make_shared<MoQRelayClientAk> (
             session->getEventBase(),
             proxygen::URL{url_fw}
         );
         relay_clients_.emplace(relay_hostname, relay_client);
+        XLOG(INFO) << "created new relay client relay_clients size= " << relay_clients_.size();
       } else {
+        XLOG(INFO) << "using existing relay client";
         relay_client = relay_client_it->second;
       }
 
@@ -102,12 +105,17 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
 
         
       auto sub_session = std::move(sub_session_expected.value());
+      XLOG(INFO) << "before adding to session_relay_clients_ size: " << session_relay_clients_.size();
       session_relay_clients_.emplace(sub_session, relay_client);
+      XLOG(INFO) << "after adding to session_relay_clients_ size: " << session_relay_clients_.size();
+
       announces_.emplace(subReq.fullTrackName.trackNamespace, std::move(sub_session));
       first_relay_.emplace(subReq.fullTrackName.trackNamespace, false);
       XLOG(INFO) << "Emplacing namespace: " << subReq.fullTrackName.trackNamespace;
+      XLOG(INFO) << "before adding next_relay_host_ size: " << next_relay_host_.size();
       next_relay_host_.emplace(subReq.fullTrackName.trackNamespace, relay_hostname);
-      
+      XLOG(INFO) << "after adding next_relay_host_ size: " << next_relay_host_.size();
+
       upstreamSessionIt = announces_.find(subReq.fullTrackName.trackNamespace);      
       if (upstreamSessionIt == announces_.end()){
         XLOG(INFO) << "ITS NULL ";
@@ -162,6 +170,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
       auto relay_client_it = relay_clients_.find(next_relay_host_[subReq.fullTrackName.trackNamespace]);
       if (relay_client_it == relay_clients_.end()) {
         XLOG(ERR) << "client not found, something is wrong";
+        co_return;
       }
       relay_client = relay_client_it->second;
     }
