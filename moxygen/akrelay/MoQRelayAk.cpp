@@ -167,7 +167,7 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
     }
     relay_client->addDownstreamSession(
         subscriptions_[subReq.fullTrackName].upstream , session);
-    relay_client->addUpstreamSessionTracknamespace(session,subReq.fullTrackName.trackNamespace);
+    // relay_client->addUpstreamSessionTracknamespace(session,subReq.fullTrackName.trackNamespace);
   }
   XLOG(INFO) <<"MOQRelayAk::onSubscribe end";
 }

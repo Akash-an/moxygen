@@ -232,7 +232,7 @@ class MoQRelayClientAk {
   }
 
   std::unique_ptr<MoQSession::ControlVisitor> makeControlVisitor(std::shared_ptr<MoQSession> session) {
-    auto controller = std::make_unique<MoQRelayClientAk::RelayClientControlVisitor>(session, controlMessageHandler_, evb_, *this);
+    auto controller = std::make_unique<MoQRelayClientAk::RelayClientControlVisitor>(session, controlMessageHandler_, evb_);
     return controller;
   }
 
