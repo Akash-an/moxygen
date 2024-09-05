@@ -174,6 +174,8 @@ folly::coro::Task<void> MoQRelayAk::onSubscribe(
     }
     relay_client->addDownstreamSession(
         subscriptions_[subReq.fullTrackName].upstream , session);
+
+    session_relay_clients_.emplace(session, relay_client);
     // relay_client->addUpstreamSessionTracknamespace(session,subReq.fullTrackName.trackNamespace);
   }
   XLOG(INFO) <<"MOQRelayAk::onSubscribe end";
@@ -245,9 +247,9 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
       if (relay_it != session_relay_clients_.end()) {
         relay_it->second->removeSessionFromData(subscription.upstream);
       }
-      XLOG(INFO) << "removing from session_relay_clients_, now len is: " << session_relay_clients_.size();
+      XLOG(INFO) << "removing upstream from session_relay_clients_, now len is: " << session_relay_clients_.size();
       session_relay_clients_.erase(subscription.upstream);
-      XLOG(INFO) << "removed from session_relay_clients_, now len is: " << session_relay_clients_.size();
+      XLOG(INFO) << "removed upstream from session_relay_clients_, now len is: " << session_relay_clients_.size();
       XLOG(INFO) << "removing from next_relay_host_, now len is: " << next_relay_host_.size();
       next_relay_host_.erase(subscriptionIt->first.trackNamespace);
       XLOG(INFO) << "removed from next_relay_host_, now len is: " << next_relay_host_.size();
@@ -266,6 +268,10 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
   if (relay_it != session_relay_clients_.end()) {
     relay_it->second->removeDownstreamSessionFromData(session);
   }
+
+  XLOG(INFO) << "removing from session_relay_clients_, now len is: " << session_relay_clients_.size();
+  session_relay_clients_.erase(session);
+  XLOG(INFO) << "removed from session_relay_clients_, now len is: " << session_relay_clients_.size();
 
   //we want to remove the announces added during subscription
   XLOG(INFO) << "pending deletions size: " << pendingDeletions.size();
@@ -293,28 +299,6 @@ folly::coro::Task<void> MoQRelayAk::onUnsubscribe(
   }
 }
 
-
-// void MoQRelayAk::onUnsubscribe(
-//     Unsubscribe unsub,
-//     std::shared_ptr<MoQSession> session) {
-//   // TODO: session+subscribe ID should uniquely identify this subscription,
-//   // we shouldn't need a linear search to find where to remove it.
-//   for (auto subscriptionIt = subscriptions_.begin();
-//        subscriptionIt != subscriptions_.end();) {
-//     auto& subscription = subscriptionIt->second;
-//     subscription.forwarder->removeSession(session, unsub.subscribeID);
-//     if (subscription.forwarder->empty()) {
-//       XLOG(INFO) << "Removed last subscriber for "
-//                  << subscriptionIt->first.trackNamespace
-//                  << subscriptionIt->first.trackName;
-//       // subscription.cancellationSource.requestCancellation();
-//       subscription.upstream->unsubscribe({subscription.subscribeID});
-//       subscriptionIt = subscriptions_.erase(subscriptionIt);
-//     } else {
-//       subscriptionIt++;
-//     }
-//   }
-// }
 
 void MoQRelayAk::removeSession(const std::shared_ptr<MoQSession>& session) {
   // TODO: remove linear search
