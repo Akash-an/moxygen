@@ -65,7 +65,7 @@ class MoQRelayAk {
   // map of hostname to relay client
   std::unordered_map<std::string, std::shared_ptr<moxygen::MoQRelayClientAk>> relay_clients_ = {};
   // map of trackname to relay hostname
-  std::unordered_map<std::string, std::string> next_relay_host_;
+  std::unordered_map<std::string, std::string> next_relay_host_ = {};
   // map of session to relay client -- need this to look up the relay client
   std::unordered_map<std::shared_ptr<MoQSession>, std::shared_ptr<moxygen::MoQRelayClientAk>> session_relay_clients_ = {};
   // std::list<std::unique_ptr<proxygen::HTTPConnector>> db_clients_ = {};

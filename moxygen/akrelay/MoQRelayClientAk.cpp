@@ -20,7 +20,6 @@ namespace moxygen {
             //data erase happens in the server unannounce through removesession
             // data_->downstreamSessions_.erase(it);
         }
-        // data_->clients_.erase(session);
     }
 
     void MoQRelayClientAk::MoQControlMessageHandler::addClient(std::shared_ptr<MoQClient> moqClient, std::shared_ptr<MoQSession> session){
