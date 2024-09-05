@@ -425,7 +425,8 @@ folly::coro::Task<void> MoQRelayAk::onUnannounce(Unannounce unAnn, std::shared_p
 
   //remove the session from relay_clients
   XLOG(INFO) << "RelayAK onUnannounce: removing from relay_clients";
-  auto relay_client_it = relay_clients_.find("kkk");
+  auto hostname = next_relay_host_[unAnn.trackNamespace];
+  auto relay_client_it = relay_clients_.find(hostname);
   if (relay_client_it != relay_clients_.end()) {
     XLOG(INFO) << "we are here!!!";
     relay_client_it->second->removeSessionFromData(session);
