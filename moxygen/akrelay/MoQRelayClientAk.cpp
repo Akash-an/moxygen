@@ -61,7 +61,7 @@ namespace moxygen {
     }
 
     void MoQRelayClientAk::removeDownstreamSessionFromData(std::shared_ptr<MoQSession> session){
-        for(auto it = controlMessageHandler_->data_->downstreamSessions_.begin(); it != controlMessageHandler_->data_->downstreamSessions_.end();){
+        for(auto it = controlMessageHandler_->data_->downstreamSessions_.begin(); it != controlMessageHandler_->data_->downstreamSessions_.end(); it++){
             it->second.erase(session);
         }
     }

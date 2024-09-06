@@ -32,7 +32,6 @@ install(
     LIBRARY DESTINATION ${LIB_INSTALL_DIR}
 )
 
-set(CMAKE_BUILD_TYPE Debug)
 
 # if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
