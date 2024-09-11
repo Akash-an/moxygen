@@ -599,6 +599,11 @@ void MoQSession::publishStatus(const ObjectHeader& objHeader) {
   publishImpl(objHeader, 0, nullptr, true);
 }
 
+
+// void MoQSession::streamWriteWithLock(){
+
+// }
+
 void MoQSession::publishImpl(
     const ObjectHeader& objHeader,
     uint64_t payloadOffset,
@@ -744,6 +749,9 @@ void MoQSession::publishImpl(
 
 
     // std::lock_guard<std::mutex> lock(writeMutex_);
+
+    std::unique_lock<std::mutex> lock(writeMutex_);
+
     auto streamid = pubDataIt->second.streamID;
     auto result = wt_->writeStreamData(
             pubDataIt->second.streamID, writeBuf.move(), streamEOM);
@@ -773,20 +781,22 @@ void MoQSession::publishImpl(
       try{
         // folly::BlockingWait(std::move(semiResult).toUnsafeFuture());
         XLOG(DBG) << "Write stream waiting...";
-        if(!semiResult.isReady()){
-           XLOG(DBG) << "Write stream Not ready, stopping";
-            // wt_->stopSending(streamid, 65);
-            wt_->resetStream(streamid, 66);
-        }
-        // std::move(semiResult).toUnsafeFuture()//.wait();
-        // .within(
-        //   std::chrono::milliseconds(5000)
-        // ).thenError<folly::FutureTimeout>([&streamEOM, this, streamid](const folly::FutureTimeout& e) {
-        //     this->wt_->stopSending(streamid, 65);
-        //     XLOG(INFO) << "timeout occurred error: " << e.what();
+        // if(!semiResult.isReady()){
+        //    XLOG(INFO) << "Write stream Not ready, reset stream: " << streamid;
+        //     // wt_->stopSending(streamid, 65);
+        //     wt_->resetStream(streamid, 66);
+        //     streamEOM = true;
+        // }
+        std::move(semiResult).via(evb_)//.wait();
+        .within(
+          std::chrono::milliseconds(5000)
+        ).thenError<folly::FutureTimeout>([&streamEOM, this, streamid](const folly::FutureTimeout& e) {
+            // this->wt_->stopSending(streamid, 65);
+            this->wt_->resetStream(streamid, 66);
+            XLOG(INFO) << "timeout occurred error: streamid: " << streamid << " error: " << e.what();
 
-        //     // streamEOM = true;
-        // });
+            streamEOM = true;
+        });
       }
       catch(std::exception& e){
         XLOG(ERR) << "Write stream error: " << e.what();
