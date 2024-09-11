@@ -310,7 +310,7 @@ public:
 
   folly::coro::Task<void> streamWriteWithLock(uint64_t streamID, std::unique_ptr<folly::IOBuf> data, bool streamEOM);
 
-  void publishImpl(
+  folly::coro::Task<void> publishImpl(
       const ObjectHeader &objHeader,
       uint64_t payloadOffset,
       std::unique_ptr<folly::IOBuf> payload,
@@ -384,6 +384,9 @@ public:
   folly::F14FastMap<PublishKey, PublishData, PublishKey::hash> publishDataMap_;
   uint64_t nextTrackId_{0};
 
+  moxygen::TimedBaton writeReady_;
+  moxygen::TimedBaton readReady_;
+
   moxygen::TimedBaton sentSetup_;
   moxygen::TimedBaton receivedSetup_;
   bool setupComplete_{false};
@@ -391,5 +394,7 @@ public:
   uint64_t nextSubscribeID_{0};
 
   std::mutex writeMutex_; 
+
+  std::unordered_map<uint64_t, std::shared_ptr<folly::SemiFuture<folly::Unit>>> writeFutures_;
 };
 } // namespace moxygen

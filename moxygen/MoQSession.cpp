@@ -592,34 +592,79 @@ void MoQSession::publish(
     std::unique_ptr<folly::IOBuf> payload,
     bool eom) {
   XCHECK_EQ(objHeader.status, ObjectStatus::NORMAL);
-  publishImpl(objHeader, payloadOffset, std::move(payload), eom);
+  publishImpl(objHeader, payloadOffset, std::move(payload), eom)
+      .scheduleOn(evb_).start();
 }
 
 void MoQSession::publishStatus(const ObjectHeader& objHeader) {
   XCHECK_NE(objHeader.status, ObjectStatus::NORMAL);
-  publishImpl(objHeader, 0, nullptr, true);
+  publishImpl(objHeader, 0, nullptr, true)
+      .scheduleOn(evb_).start();
 }
 
 
 folly::coro::Task<void> MoQSession::streamWriteWithLock(uint64_t streamID, std::unique_ptr<folly::IOBuf> data, bool streamEOM){
   XLOG(DBG1) << __func__ << " locked streamID=" << streamID;
-  std::unique_lock<std::mutex> lock(writeMutex_);
+  // std::unique_lock<std::mutex> lock(writeMutex_);
+
+  auto it = writeFutures_.find(streamID);
+  if (it != writeFutures_.end()) {
+    auto ftr_ptr = it->second;
+    auto ftr = std::move(*ftr_ptr).via(evb_);
+    co_await std::move(ftr);
+  }
 
   try{
   auto result_expected = wt_->writeStreamData(
             streamID, std::move(data), streamEOM);
   auto result = std::move(result_expected).value();
-    folly::EventBaseThreadTimekeeper tk(*evb_);
+  // writeFutures_.insert({streamID, std::make_shared<folly::SemiFuture<folly::Unit>>(std::move(result))});
+  writeFutures_[streamID] = std::make_shared<folly::SemiFuture<folly::Unit>>(std::move(result));
 
-  // co_await folly::coro::timeout(
-  //   std::move(result).wait(),
+
+  // folly::EventBaseThreadTimekeeper tk(*evb_);
+  // auto deletedToken = cancellationSource_.getToken();
+  // auto token = co_await folly::coro::co_current_cancellation_token;
+  
+  // auto r = co_await co_awaitTry(folly::coro::co_withCancellation(
+  //   folly::CancellationToken::merge(deletedToken, token),
+  //   folly::coro::timeout(
+  //     folly::coro::collectAllTry(std::move(result).via(evb_)),
+  //     kSetupTimeout,
+  //     &tk
+  // )));
+  // if (r.hasValue()) {
+    
+  //   XLOG(DBG) << "writeStreamData succeeded";
+  // }
+
+  // if (r.hasException()) { 
+  //   XLOG(ERR) << "writeStreamData Execption: " << r.exception().what();
+  // }
+
+
+  // if(token.isCancellationRequested()){
+  //   XLOG(ERR) << "timed out";
+  // }
+
+  //   co_await folly::coro::timeout(
+  //   folly::coro::collectAll(writeReady_.wait()),
   //   kSetupTimeout,
   //   &tk
   // );
 
-   std::move(result).via(evb_)
-    .wait(std::chrono::seconds(5));
+  // co_await folly::coro::timeout(
+  //   std::move(result).via(evb_),
+  //   kSetupTimeout,
+  //   &tk
+  // );
 
+
+  //  co_await std::move(result).via(evb_)
+  //   // .wait(std::chrono::seconds(5))
+  //   .onTimeout(std::chrono::seconds(5),[]{
+  //     XLOG(ERR) << "writeStreamData timed out";
+  //   });
   // co_await folly::coro::collectAny()
 
   // co_await std::move(result).via(evb_)
@@ -632,7 +677,7 @@ folly::coro::Task<void> MoQSession::streamWriteWithLock(uint64_t streamID, std::
   co_return;
 }
 
-void MoQSession::publishImpl(
+folly::coro::Task<void> MoQSession::publishImpl(
     const ObjectHeader& objHeader,
     uint64_t payloadOffset,
     std::unique_ptr<folly::IOBuf> payload,
@@ -668,7 +713,7 @@ void MoQSession::publishImpl(
           << __func__
           << " Can't start publishing in the middle. Disgregard data for this new obj with payloadOffset = "
           << payloadOffset;
-      return;
+      co_return;
     }
 
     // Create a new stream (except for datagram)
@@ -678,7 +723,7 @@ void MoQSession::publishImpl(
       if (!res) {
         // failed to create a stream
         XLOG(ERR) << "Failed to create uni stream";
-        return;
+        co_return;
       }
       stream = *res;
     }
@@ -713,14 +758,14 @@ void MoQSession::publishImpl(
       XLOG(DBG) << "Track preference";
       if (objHeader.group < pubDataIt->second.group) {
         XLOG(ERR) << "Decreasing group in Track";
-        return;
+        co_return;
       }
       if (objHeader.group == pubDataIt->second.group) {
         if (objHeader.id < pubDataIt->second.objectID ||
             (objHeader.id == pubDataIt->second.objectID &&
              pubDataIt->second.offset != 0)) {
           XLOG(ERR) << "obj id must increase within group";
-          return;
+          co_return;
         }
       }
       multiObject = true;
@@ -730,7 +775,7 @@ void MoQSession::publishImpl(
           (objHeader.id == pubDataIt->second.objectID &&
            pubDataIt->second.offset != 0)) {
         XLOG(ERR) << "obj id must increase within group";
-        return;
+        co_return;
       }
       multiObject = true;
     }
@@ -749,7 +794,7 @@ void MoQSession::publishImpl(
   if (pubDataIt->second.objectLength &&
       *pubDataIt->second.objectLength < payloadLength) {
     XLOG(ERR) << "Object length exceeds header length";
-    return;
+    co_return;
   }
   writeBuf.append(std::move(payload));
   if (sendAsDatagram) {
@@ -782,11 +827,25 @@ void MoQSession::publishImpl(
 
     auto streamid = pubDataIt->second.streamID;
 
-    streamWriteWithLock(streamid, writeBuf.move(), streamEOM)
-              .scheduleOn(evb_).start();
+    // streamWriteWithLock(streamid, writeBuf.move(), streamEOM)
+    //           .scheduleOn(evb_).start();
+
+    auto it = writeFutures_.find(streamid);
+    if (it != writeFutures_.end()) {
+      auto ftr_ptr = it->second;
+      auto ftr = std::move(*ftr_ptr).via(evb_);
+      co_await std::move(ftr);
+    }
     // auto result = wt_->writeStreamData(
     //         pubDataIt->second.streamID, writeBuf.move(), streamEOM);
     
+  auto result_expected = wt_->writeStreamData(
+            streamid, writeBuf.move(), streamEOM);
+  auto result = std::move(result_expected).value();
+  // writeFutures_.insert({streamID, std::make_shared<folly::SemiFuture<folly::Unit>>(std::move(result))});
+  writeFutures_[streamid] = std::make_shared<folly::SemiFuture<folly::Unit>>(std::move(result));
+
+
     // if (result.hasValue()) {
     //   auto semiResult = std::move(result).value();
 
@@ -835,6 +894,7 @@ void MoQSession::publishImpl(
     // }
     XLOG(DBG) << "Write stream data done";
     if (streamEOM) {
+      writeFutures_.erase(pubDataIt->second.streamID);
       publishDataMap_.erase(pubDataIt);
     } else {
       if (eom) {
