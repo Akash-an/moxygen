@@ -602,14 +602,19 @@ void MoQSession::publishStatus(const ObjectHeader& objHeader) {
 
 
 folly::coro::Task<void> MoQSession::streamWriteWithLock(uint64_t streamID, std::unique_ptr<folly::IOBuf> data, bool streamEOM){
-  XLOG(DBG1) << __func__ << " streamID=" << streamID;
+  XLOG(DBG1) << __func__ << " locked streamID=" << streamID;
   std::unique_lock<std::mutex> lock(writeMutex_);
 
+  try{
   auto result_expected = wt_->writeStreamData(
             streamID, std::move(data), streamEOM);
   auto result = std::move(result_expected).value();
-  co_await std::move(result).via(evb_);
-  XLOG(DBG1) << __func__ << " unlocked";
+  co_await std::move(result).via(evb_)
+                .within(std::chrono::seconds(5));
+  } catch (const std::exception& e) {
+    XLOG(ERR) << "writeStreamData failed: " << e.what();
+  }
+  XLOG(DBG1) << __func__ << " unlocked streamID=" << streamID;
 }
 
 void MoQSession::publishImpl(
