@@ -609,8 +609,16 @@ folly::coro::Task<void> MoQSession::streamWriteWithLock(uint64_t streamID, std::
   auto result_expected = wt_->writeStreamData(
             streamID, std::move(data), streamEOM);
   auto result = std::move(result_expected).value();
-  co_await std::move(result).via(evb_)
-                .within(std::chrono::seconds(5));
+    folly::EventBaseThreadTimekeeper tk(*evb_);
+
+  co_await folly::coro::timeout(
+    std::move(result).wait(),
+    kSetupTimeout,
+    &tk
+  );
+
+  // co_await std::move(result).via(evb_)
+  //               .within(std::chrono::seconds(5));
   } catch (const std::exception& e) {
     XLOG(ERR) << "writeStreamData failed: " << e.what();
   }
