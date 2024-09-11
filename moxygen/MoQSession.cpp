@@ -611,11 +611,16 @@ folly::coro::Task<void> MoQSession::streamWriteWithLock(uint64_t streamID, std::
   auto result = std::move(result_expected).value();
     folly::EventBaseThreadTimekeeper tk(*evb_);
 
-  co_await folly::coro::timeout(
-    std::move(result).wait(),
-    kSetupTimeout,
-    &tk
-  );
+  // co_await folly::coro::timeout(
+  //   std::move(result).wait(),
+  //   kSetupTimeout,
+  //   &tk
+  // );
+
+  co_await std::move(result).via(evb_)
+    .wait(std::chrono::seconds(5));
+
+  // co_await folly::coro::collectAny()
 
   // co_await std::move(result).via(evb_)
   //               .within(std::chrono::seconds(5));
