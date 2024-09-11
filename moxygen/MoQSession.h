@@ -308,8 +308,10 @@ public:
   void onGoaway(Goaway goaway) override;
   void onConnectionError(ErrorCode error) override;
 
+  folly::coro::Task<void> streamWriteWithLock(uint64_t streamID, std::unique_ptr<folly::IOBuf> data, bool streamEOM);
+
   void publishImpl(
-      const ObjectHeader& objHeader,
+      const ObjectHeader &objHeader,
       uint64_t payloadOffset,
       std::unique_ptr<folly::IOBuf> payload,
       bool eom);

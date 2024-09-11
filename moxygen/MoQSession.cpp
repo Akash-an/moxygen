@@ -12,6 +12,7 @@
 #include <folly/logging/xlog.h>
 #include <folly/futures/Future.h>
 #include <folly/futures/Promise.h>
+#include "MoQSession.h"
 
 namespace {
 constexpr std::chrono::seconds kSetupTimeout(5);
@@ -276,7 +277,7 @@ void MoQSession::TrackHandle::onObjectPayload(
     uint64_t id,
     std::unique_ptr<folly::IOBuf> payload,
     bool eom) {
-  XLOG(DBG1) << __func__  << "g=" << groupId << " o=" << id
+  XLOG(DBG1) << __func__  << " g=" << groupId << " o=" << id
              << " len=" << (payload ? payload->computeChainDataLength() : 0)
              << " eom=" << uint64_t(eom);
              
@@ -600,9 +601,16 @@ void MoQSession::publishStatus(const ObjectHeader& objHeader) {
 }
 
 
-// void MoQSession::streamWriteWithLock(){
+folly::coro::Task<void> MoQSession::streamWriteWithLock(uint64_t streamID, std::unique_ptr<folly::IOBuf> data, bool streamEOM){
+  XLOG(DBG1) << __func__ << " streamID=" << streamID;
+  std::unique_lock<std::mutex> lock(writeMutex_);
 
-// }
+  auto result_expected = wt_->writeStreamData(
+            streamID, std::move(data), streamEOM);
+  auto result = std::move(result_expected).value();
+  co_await std::move(result).via(evb_);
+  XLOG(DBG1) << __func__ << " unlocked";
+}
 
 void MoQSession::publishImpl(
     const ObjectHeader& objHeader,
@@ -750,58 +758,61 @@ void MoQSession::publishImpl(
 
     // std::lock_guard<std::mutex> lock(writeMutex_);
 
-    std::unique_lock<std::mutex> lock(writeMutex_);
+    // std::unique_lock<std::mutex> lock(writeMutex_);
 
     auto streamid = pubDataIt->second.streamID;
-    auto result = wt_->writeStreamData(
-            pubDataIt->second.streamID, writeBuf.move(), streamEOM);
+
+    streamWriteWithLock(streamid, writeBuf.move(), streamEOM)
+              .scheduleOn(evb_).start();
+    // auto result = wt_->writeStreamData(
+    //         pubDataIt->second.streamID, writeBuf.move(), streamEOM);
     
-    if (result.hasValue()) {
-      auto semiResult = std::move(result).value();
+    // if (result.hasValue()) {
+    //   auto semiResult = std::move(result).value();
 
-          // Combine the original future with the timeout future
-      // auto combinedFuture = folly::Future<folly::Unit>::orWith(
-      //     std::move(semiResult).toUnsafeFuture(),
-      //     std::move(timeoutFuture)
-      // );
+    //       // Combine the original future with the timeout future
+    //   // auto combinedFuture = folly::Future<folly::Unit>::orWith(
+    //   //     std::move(semiResult).toUnsafeFuture(),
+    //   //     std::move(timeoutFuture)
+    //   // );
 
-      // auto combinedFuture = folly::collect(
-      //     std::move(semiResult).toUnsafeFuture(),
-      //     std::move(timeoutFuture)
-      // );
+    //   // auto combinedFuture = folly::collect(
+    //   //     std::move(semiResult).toUnsafeFuture(),
+    //   //     std::move(timeoutFuture)
+    //   // );
 
-      // auto combinedFuture = folly::onTimeout(
-      //       std::move(semiResult).toUnsafeFuture(),
-      //       std::move(timeoutFuture),
-      //       []() {
-      //           // Timeout occurred
-      //       }
-      //   );
+    //   // auto combinedFuture = folly::onTimeout(
+    //   //       std::move(semiResult).toUnsafeFuture(),
+    //   //       std::move(timeoutFuture),
+    //   //       []() {
+    //   //           // Timeout occurred
+    //   //       }
+    //   //   );
 
-      try{
-        // folly::BlockingWait(std::move(semiResult).toUnsafeFuture());
-        XLOG(DBG) << "Write stream waiting...";
-        // if(!semiResult.isReady()){
-        //    XLOG(INFO) << "Write stream Not ready, reset stream: " << streamid;
-        //     // wt_->stopSending(streamid, 65);
-        //     wt_->resetStream(streamid, 66);
-        //     streamEOM = true;
-        // }
-        std::move(semiResult).via(evb_)//.wait();
-        .within(
-          std::chrono::milliseconds(5000)
-        ).thenError<folly::FutureTimeout>([&streamEOM, this, streamid](const folly::FutureTimeout& e) {
-            // this->wt_->stopSending(streamid, 65);
-            this->wt_->resetStream(streamid, 66);
-            XLOG(INFO) << "timeout occurred error: streamid: " << streamid << " error: " << e.what();
+    //   try{
+    //     // folly::BlockingWait(std::move(semiResult).toUnsafeFuture());
+    //     XLOG(DBG) << "Write stream waiting...";
+    //     // if(!semiResult.isReady()){
+    //     //    XLOG(INFO) << "Write stream Not ready, reset stream: " << streamid;
+    //     //     // wt_->stopSending(streamid, 65);
+    //     //     wt_->resetStream(streamid, 66);
+    //     //     streamEOM = true;
+    //     // }
+    //     std::move(semiResult).via(evb_)//.wait();
+    //     .within(
+    //       std::chrono::milliseconds(5000)
+    //     ).thenError<folly::FutureTimeout>([&streamEOM, this, streamid](const folly::FutureTimeout& e) {
+    //         // this->wt_->stopSending(streamid, 65);
+    //         this->wt_->resetStream(streamid, 66);
+    //         XLOG(INFO) << "timeout occurred error: streamid: " << streamid << " error: " << e.what();
 
-            streamEOM = true;
-        });
-      }
-      catch(std::exception& e){
-        XLOG(ERR) << "Write stream error: " << e.what();
-      }
-    }
+    //         streamEOM = true;
+    //     });
+    //   }
+    //   catch(std::exception& e){
+    //     XLOG(ERR) << "Write stream error: " << e.what();
+    //   }
+    // }
     XLOG(DBG) << "Write stream data done";
     if (streamEOM) {
       publishDataMap_.erase(pubDataIt);
