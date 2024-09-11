@@ -617,7 +617,7 @@ folly::coro::Task<void> MoQSession::streamWriteWithLock(uint64_t streamID, std::
   //   &tk
   // );
 
-  co_await std::move(result).via(evb_)
+   std::move(result).via(evb_)
     .wait(std::chrono::seconds(5));
 
   // co_await folly::coro::collectAny()
@@ -628,6 +628,8 @@ folly::coro::Task<void> MoQSession::streamWriteWithLock(uint64_t streamID, std::
     XLOG(ERR) << "writeStreamData failed: " << e.what();
   }
   XLOG(DBG1) << __func__ << " unlocked streamID=" << streamID;
+
+  co_return;
 }
 
 void MoQSession::publishImpl(
