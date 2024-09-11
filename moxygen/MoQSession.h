@@ -219,30 +219,6 @@ class MoQSession : public MoQCodec::Callback {
       return latest_;
     }
 
-    // folly::coro::Task<void> storeObjects(ObjectHeader objHeader) {
-    //   while (objects_.size() > 100) {
-    //     auto grp_to_be_removed = co_await objects_order_.dequeue();
-    //     auto it = objects_.find(grp_to_be_removed);
-    //     if(it != objects_.end()) {
-    //       objects_.erase(it);
-    //     }
-    //   }
-
-    //  auto res = objects_.emplace(
-    //         std::piecewise_construct,
-    //         std::forward_as_tuple(std::make_pair(objHeader.group, objHeader.id)),
-    //         std::forward_as_tuple(std::make_shared<ObjectSource>())
-    //   );
-
-    //   objects_order_.enqueue(std::make_pair(objHeader.group, objHeader.id));
-      
-    //   res.first->second->header = std::move(objHeader);
-    //   res.first->second->fullTrackName = fullTrackName_;
-    //   res.first->second->cancelToken = cancelToken_;
-    //   newObjects_.enqueue(res.first->second);
-
-    //   co_return;
-    // }
 
    private:
     FullTrackName fullTrackName_;
@@ -411,5 +387,7 @@ public:
   bool setupComplete_{false};
 
   uint64_t nextSubscribeID_{0};
+
+  std::mutex writeMutex_; 
 };
 } // namespace moxygen

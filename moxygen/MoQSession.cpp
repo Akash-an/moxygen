@@ -8,8 +8,10 @@
 #include <folly/experimental/coro/Collect.h>
 #include <folly/futures/ThreadWheelTimekeeper.h>
 #include <folly/io/async/EventBase.h>
-
+#include <folly/coro/BlockingWait.h>
 #include <folly/logging/xlog.h>
+#include <folly/futures/Future.h>
+#include <folly/futures/Promise.h>
 
 namespace {
 constexpr std::chrono::seconds kSetupTimeout(5);
@@ -274,7 +276,7 @@ void MoQSession::TrackHandle::onObjectPayload(
     uint64_t id,
     std::unique_ptr<folly::IOBuf> payload,
     bool eom) {
-  XLOG(DBG1) << __func__ << " g=" << groupId << " o=" << id
+  XLOG(DBG1) << __func__  << "g=" << groupId << " o=" << id
              << " len=" << (payload ? payload->computeChainDataLength() : 0)
              << " eom=" << uint64_t(eom);
              
@@ -296,6 +298,7 @@ void MoQSession::TrackHandle::onObjectPayload(
   try{
     auto obj = object_cache_.getWithoutPromotion(std::make_pair(groupId, id));
     if (obj) {
+      XLOG(DBG1) << "payload for trackName=" << obj->fullTrackName.trackName;
       if(payload){
         XLOG(DBG1) << "payload enqueued";
         obj->payloadQueue.enqueue(std::move(payload));
@@ -674,6 +677,7 @@ void MoQSession::publishImpl(
     // validate group and object are moving in the right direction
     bool multiObject = false;
     if (objHeader.forwardPreference == ForwardPreference::Track) {
+      XLOG(DBG) << "Track preference";
       if (objHeader.group < pubDataIt->second.group) {
         XLOG(ERR) << "Decreasing group in Track";
         return;
@@ -688,6 +692,7 @@ void MoQSession::publishImpl(
       }
       multiObject = true;
     } else if (objHeader.forwardPreference == ForwardPreference::Group) {
+      XLOG(DBG) << "Group preference";
       if (objHeader.id < pubDataIt->second.objectID ||
           (objHeader.id == pubDataIt->second.objectID &&
            pubDataIt->second.offset != 0)) {
@@ -724,8 +729,70 @@ void MoQSession::publishImpl(
          objHeader.status == ObjectStatus::END_OF_TRACK_AND_GROUP);
     XLOG_IF(DBG1, streamEOM) << "End of stream";
     // TODO: verify that pubDataIt->second.objectLength is empty or 0
-    wt_->writeStreamData(
-        pubDataIt->second.streamID, writeBuf.move(), streamEOM);
+    XLOG(DBG) << "Write stream data streamId = " << pubDataIt->second.streamID;
+    
+
+    // folly::Promise<folly::Unit> timeoutPromise;
+    // folly::Future<folly::Unit> timeoutFuture = timeoutPromise.getFuture();
+    
+    // Set a timeout period (e.g., 5 seconds)
+    // std::thread([timeoutPromise = std::move(timeoutPromise)]() mutable {
+    //     std::this_thread::sleep_for(std::chrono::seconds(5));
+    //     timeoutPromise.setValue();
+    // }).detach();
+    
+
+
+    // std::lock_guard<std::mutex> lock(writeMutex_);
+    auto streamid = pubDataIt->second.streamID;
+    auto result = wt_->writeStreamData(
+            pubDataIt->second.streamID, writeBuf.move(), streamEOM);
+    
+    if (result.hasValue()) {
+      auto semiResult = std::move(result).value();
+
+          // Combine the original future with the timeout future
+      // auto combinedFuture = folly::Future<folly::Unit>::orWith(
+      //     std::move(semiResult).toUnsafeFuture(),
+      //     std::move(timeoutFuture)
+      // );
+
+      // auto combinedFuture = folly::collect(
+      //     std::move(semiResult).toUnsafeFuture(),
+      //     std::move(timeoutFuture)
+      // );
+
+      // auto combinedFuture = folly::onTimeout(
+      //       std::move(semiResult).toUnsafeFuture(),
+      //       std::move(timeoutFuture),
+      //       []() {
+      //           // Timeout occurred
+      //       }
+      //   );
+
+      try{
+        // folly::BlockingWait(std::move(semiResult).toUnsafeFuture());
+        XLOG(DBG) << "Write stream waiting...";
+        if(!semiResult.isReady()){
+           XLOG(DBG) << "Write stream Not ready, stopping";
+            // wt_->stopSending(streamid, 65);
+            wt_->resetStream(streamid, 66);
+        }
+        // std::move(semiResult).toUnsafeFuture()//.wait();
+        // .within(
+        //   std::chrono::milliseconds(5000)
+        // ).thenError<folly::FutureTimeout>([&streamEOM, this, streamid](const folly::FutureTimeout& e) {
+        //     this->wt_->stopSending(streamid, 65);
+        //     XLOG(INFO) << "timeout occurred error: " << e.what();
+
+        //     // streamEOM = true;
+        // });
+      }
+      catch(std::exception& e){
+        XLOG(ERR) << "Write stream error: " << e.what();
+      }
+    }
+    XLOG(DBG) << "Write stream data done";
     if (streamEOM) {
       publishDataMap_.erase(pubDataIt);
     } else {

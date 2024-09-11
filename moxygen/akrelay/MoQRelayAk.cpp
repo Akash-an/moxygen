@@ -194,8 +194,11 @@ folly::coro::Task<void> MoQRelayAk::forwardTrack(
     folly::IOBufQueue payloadBuf{folly::IOBufQueue::cacheChainLength()};
     uint64_t payloadOffset = 0;
     bool eom = false;
+    int counter = 0;
     while (!eom) {
+      counter++;
       auto payload = co_await obj.value()->payloadQueue.dequeue();
+
       if (payload) {
         payloadBuf.append(std::move(payload));
         XLOG(DBG1) << __func__
@@ -207,6 +210,10 @@ folly::coro::Task<void> MoQRelayAk::forwardTrack(
       }
       auto payloadLength = payloadBuf.chainLength();
       if (eom || payloadOffset + payloadLength > 1280) {
+        XLOG(DBG1) << __func__ << " payload before publish;"
+                  << " g=" << obj.value()->header.group
+                  << " o=" << obj.value()->header.id
+                  << " counter= " << counter;
         fowarder->publish(
             obj.value()->header, payloadBuf.move(), payloadOffset, eom);
         payloadOffset += payloadLength;
