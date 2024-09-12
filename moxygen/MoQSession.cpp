@@ -678,7 +678,7 @@ folly::coro::Task<void> MoQSession::streamWriteWithLock(uint64_t streamID, std::
 }
 
 folly::coro::Task<void> MoQSession::publishImpl(
-    const ObjectHeader& objHeader,
+    const ObjectHeader objHeader,
     uint64_t payloadOffset,
     std::unique_ptr<folly::IOBuf> payload,
     bool eom) {

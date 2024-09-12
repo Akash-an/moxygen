@@ -311,7 +311,7 @@ public:
   folly::coro::Task<void> streamWriteWithLock(uint64_t streamID, std::unique_ptr<folly::IOBuf> data, bool streamEOM);
 
   folly::coro::Task<void> publishImpl(
-      const ObjectHeader &objHeader,
+      const ObjectHeader objHeader,
       uint64_t payloadOffset,
       std::unique_ptr<folly::IOBuf> payload,
       bool eom);
