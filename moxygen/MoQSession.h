@@ -15,6 +15,8 @@
 #include <folly/experimental/coro/Task.h>
 #include <folly/experimental/coro/UnboundedQueue.h>
 #include <folly/logging/xlog.h>
+#include <folly/container/EvictingCacheMap.h>
+
 #include "moxygen/util/TimedBaton.h"
 
 #include <boost/variant.hpp>
@@ -27,7 +29,10 @@ class MoQSession : public MoQCodec::Callback {
       MoQCodec::Direction dir,
       proxygen::WebTransport* wt,
       folly::EventBase* evb)
-      : dir_(dir), wt_(wt), evb_(evb) {}
+      : dir_(dir), wt_(wt), evb_(evb) {
+        id = nextid;
+        nextid++;
+      }
 
   [[nodiscard]] folly::EventBase* getEventBase() const {
     return evb_;
@@ -119,8 +124,7 @@ class MoQSession : public MoQCodec::Callback {
 
   folly::coro::AsyncGenerator<MoQMessage> controlMessages();
 
-  folly::coro::Task<folly::Expected<AnnounceOk, AnnounceError>> announce(
-      Announce ann);
+  folly::coro::Task<folly::Expected<AnnounceOk, AnnounceError>> announce(Announce ann);
   void announceOk(AnnounceOk annOk);
   void announceError(AnnounceError announceError);
   void unannounce(Unannounce unannounce);
@@ -161,6 +165,7 @@ class MoQSession : public MoQCodec::Callback {
     folly::coro::Task<
         folly::Expected<std::shared_ptr<TrackHandle>, SubscribeError>>
     ready() {
+      XLOG(INFO) << "TrackHandle::ready()";
       co_return co_await std::move(future_);
     }
 
@@ -214,6 +219,31 @@ class MoQSession : public MoQCodec::Callback {
       return latest_;
     }
 
+    // folly::coro::Task<void> storeObjects(ObjectHeader objHeader) {
+    //   while (objects_.size() > 100) {
+    //     auto grp_to_be_removed = co_await objects_order_.dequeue();
+    //     auto it = objects_.find(grp_to_be_removed);
+    //     if(it != objects_.end()) {
+    //       objects_.erase(it);
+    //     }
+    //   }
+
+    //  auto res = objects_.emplace(
+    //         std::piecewise_construct,
+    //         std::forward_as_tuple(std::make_pair(objHeader.group, objHeader.id)),
+    //         std::forward_as_tuple(std::make_shared<ObjectSource>())
+    //   );
+
+    //   objects_order_.enqueue(std::make_pair(objHeader.group, objHeader.id));
+      
+    //   res.first->second->header = std::move(objHeader);
+    //   res.first->second->fullTrackName = fullTrackName_;
+    //   res.first->second->cancelToken = cancelToken_;
+    //   newObjects_.enqueue(res.first->second);
+
+    //   co_return;
+    // }
+
    private:
     FullTrackName fullTrackName_;
     uint64_t subscribeID_;
@@ -226,15 +256,22 @@ class MoQSession : public MoQCodec::Callback {
     folly::
         F14FastMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>>
             objects_;
+          
+    //not used; for tracking the order to remove
+    folly::coro::UnboundedQueue<std::pair<uint64_t, uint64_t>, true, true>
+        objects_order_;
+    
+    //using this instead of objects_
+    folly::EvictingCacheMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>> 
+        object_cache_ = folly::EvictingCacheMap<std::pair<uint64_t, uint64_t>, std::shared_ptr<ObjectSource>>(5000);
+    
     folly::coro::UnboundedQueue<std::shared_ptr<ObjectSource>, true, true>
         newObjects_;
     folly::Optional<AbsoluteLocation> latest_;
     folly::CancellationToken cancelToken_;
   };
 
-  folly::coro::Task<
-      folly::Expected<std::shared_ptr<TrackHandle>, SubscribeError>>
-  subscribe(SubscribeRequest sub);
+  folly::coro::Task<folly::Expected<std::shared_ptr<TrackHandle>, SubscribeError>> subscribe(SubscribeRequest sub);
   void subscribeOk(SubscribeOk subOk);
   void subscribeError(SubscribeError subErr);
   void unsubscribe(Unsubscribe unsubscribe);
@@ -253,6 +290,13 @@ class MoQSession : public MoQCodec::Callback {
   void onDatagram(std::unique_ptr<folly::IOBuf> datagram);
 
   folly::coro::Task<void> setupComplete();
+
+  int id;
+
+public:
+  static int nextid;
+
+  void onUnannounce(Unannounce unannounce) override;
 
  private:
   folly::coro::Task<void> controlWriteLoop(
@@ -282,7 +326,6 @@ class MoQSession : public MoQCodec::Callback {
   void onAnnounce(Announce announce) override;
   void onAnnounceOk(AnnounceOk announceOk) override;
   void onAnnounceError(AnnounceError announceError) override;
-  void onUnannounce(Unannounce unannounce) override;
   void onAnnounceCancel(AnnounceCancel announceCancel) override;
   void onTrackStatusRequest(TrackStatusRequest trackStatusRequest) override;
   void onTrackStatus(TrackStatus trackStatus) override;
@@ -351,6 +394,7 @@ class MoQSession : public MoQCodec::Callback {
   // Subscriber State
   // Subscribe ID -> Track Handle
   folly::F14FastMap<uint64_t, std::shared_ptr<TrackHandle>> subTracks_;
+    folly::CancellationSource cancellationSource_;
 
   // Publisher State
   // Track Namespace -> Promise<AnnounceOK>
@@ -365,7 +409,6 @@ class MoQSession : public MoQCodec::Callback {
   moxygen::TimedBaton sentSetup_;
   moxygen::TimedBaton receivedSetup_;
   bool setupComplete_{false};
-  folly::CancellationSource cancellationSource_;
 
   uint64_t nextSubscribeID_{0};
 };

@@ -36,6 +36,7 @@ install(
 )
 
 add_subdirectory(relay)
+add_subdirectory(akrelay)
 # TODO: Fails with compiler error in ubuntu P1361252588
 # add_subdirectory(samples/chat)
 add_subdirectory(samples/text-client)

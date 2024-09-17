@@ -52,6 +52,7 @@ folly::coro::Task<void> MoQClient::setupMoQSession(
        {proxygen::SettingsId::_HQ_DATAGRAM, 1},
        {proxygen::SettingsId::_HQ_DATAGRAM_RFC, 1},
        {proxygen::SettingsId::ENABLE_WEBTRANSPORT, 1}});
+       XLOG(DBG) << "connect to " << url_.getHost() << ":" << url_.getPort();
   hqConnector.connect(
       evb_,
       folly::none,
@@ -102,6 +103,7 @@ folly::coro::Task<void> MoQClient::setupMoQSession(
 
 void MoQClient::HTTPHandler::onHeadersComplete(
     std::unique_ptr<proxygen::HTTPMessage> resp) noexcept {
+  XLOG(DBG1) << __func__;
   if (resp->getStatusCode() != 200) {
     txn_->sendAbort();
     sessionContract.first.setException(std::runtime_error(
@@ -114,8 +116,9 @@ void MoQClient::HTTPHandler::onHeadersComplete(
     txn_->sendAbort();
     return;
   }
-  sessionContract.first.setValue(std::make_shared<MoQSession>(
-      MoQCodec::Direction::CLIENT, wt, client_.evb_));
+  session_ = std::make_shared<MoQSession>(
+      MoQCodec::Direction::CLIENT, wt, client_.evb_);
+  sessionContract.first.setValue(session_);
 }
 
 void MoQClient::HTTPHandler::onError(

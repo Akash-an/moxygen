@@ -17,7 +17,10 @@ constexpr std::chrono::seconds kSetupTimeout(5);
 
 namespace moxygen {
 
+int  MoQSession::nextid = 1;
+
 MoQSession::~MoQSession() {
+  XLOG(DBG1) << __func__;
   cancellationSource_.requestCancellation();
   for (auto& subTrack : subTracks_) {
     subTrack.second->subscribeError(
@@ -107,6 +110,7 @@ void MoQSession::setup(ServerSetup setup) {
 }
 
 folly::coro::Task<void> MoQSession::setupComplete() {
+  XLOG(DBG1) << __func__<< " called";
   auto deletedToken = cancellationSource_.getToken();
   auto token = co_await folly::coro::co_current_cancellation_token;
   folly::EventBaseThreadTimekeeper tk(*evb_);
@@ -126,11 +130,14 @@ folly::coro::Task<void> MoQSession::setupComplete() {
     close();
     co_yield folly::coro::co_error(std::runtime_error("setup failed"));
   }
+    XLOG(DBG1) << __func__<< " done " << setupComplete_;
 }
 
 folly::coro::AsyncGenerator<MoQSession::MoQMessage>
 MoQSession::controlMessages() {
   XLOG(DBG1) << __func__;
+      
+
   while (true) {
     auto message =
         co_await folly::coro::co_awaitTry(folly::coro::co_withCancellation(
@@ -151,6 +158,9 @@ folly::coro::Task<void> MoQSession::readLoop(
   // TODO: disallow OBJECT on control streams and non-object on non-control
   bool fin = false;
   while (!fin) {
+    if (readHandle==nullptr) {
+      XLOG(ERR) << "Stream closed... add this nullptr check";
+    }
     auto streamData = co_await folly::coro::co_awaitTry(
         readHandle->readStreamData().via(evb_));
     if (streamData.hasException()) {
@@ -172,6 +182,8 @@ void MoQSession::onClientSetup(ClientSetup clientSetup) {
           clientSetup.supportedVersions.begin(),
           clientSetup.supportedVersions.end(),
           kVersionDraftCurrent) == clientSetup.supportedVersions.end()) {
+
+    XLOG(ERR) << "Expected version = " << kVersionDraftCurrent;
     XLOG(ERR) << "No matching versions";
     for (auto v : clientSetup.supportedVersions) {
       XLOG(ERR) << "client sent=" << v;
@@ -195,6 +207,7 @@ void MoQSession::onServerSetup(ServerSetup serverSetup) {
   }
   receivedSetup_.signal();
   controlMessages_.enqueue(std::move(serverSetup));
+  XLOG(DBG1) << "setup frame enqueued";
 }
 
 void MoQSession::onObjectHeader(ObjectHeader objHeader) {
@@ -227,14 +240,29 @@ void MoQSession::onObjectPayload(
 
 void MoQSession::TrackHandle::onObjectHeader(ObjectHeader objHeader) {
   XLOG(DBG1) << __func__;
-  auto res = objects_.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(std::make_pair(objHeader.group, objHeader.id)),
-      std::forward_as_tuple(std::make_shared<ObjectSource>()));
-  res.first->second->header = std::move(objHeader);
-  res.first->second->fullTrackName = fullTrackName_;
-  res.first->second->cancelToken = cancelToken_;
-  newObjects_.enqueue(res.first->second);
+  // auto res = objects_.emplace(
+  //     std::piecewise_construct,
+  //     std::forward_as_tuple(std::make_pair(objHeader.group, objHeader.id)),
+  //     std::forward_as_tuple(std::make_shared<ObjectSource>()));
+  // res.first->second->header = std::move(objHeader);
+  // res.first->second->fullTrackName = fullTrackName_;
+  // res.first->second->cancelToken = cancelToken_;
+  // newObjects_.enqueue(res.first->second);
+
+
+  auto obj_source = std::make_shared<ObjectSource>();
+  obj_source->header = std::move(objHeader);
+  obj_source->fullTrackName = fullTrackName_;
+  obj_source->cancelToken = cancelToken_;
+  newObjects_.enqueue(obj_source);
+  object_cache_.set(std::make_pair(objHeader.group, objHeader.id), std::move(obj_source));
+  
+
+
+  XLOG(DBG1) << "size of objects now: " << objects_.size();
+  XLOG(DBG1) << "size of newObjects now: " << newObjects_.size();
+  XLOG(DBG1) << "size of objects_cache now: " << object_cache_.size();
+
 }
 
 void MoQSession::TrackHandle::fin() {
@@ -249,24 +277,44 @@ void MoQSession::TrackHandle::onObjectPayload(
   XLOG(DBG1) << __func__ << " g=" << groupId << " o=" << id
              << " len=" << (payload ? payload->computeChainDataLength() : 0)
              << " eom=" << uint64_t(eom);
-  auto objIt = objects_.find(std::make_pair(groupId, id));
-  if (objIt == objects_.end()) {
-    // error;
+             
+  // auto objIt = objects_.find(std::make_pair(groupId, id));
+  // if (objIt == objects_.end()) {
+  //   // error;
+  //   XLOG(ERR) << "unknown object gid=" << groupId << " seq=" << id;
+  //   return;
+  // }
+  // if (payload) {
+  //   XLOG(DBG1) << "payload enqueued";
+  //   objIt->second->payloadQueue.enqueue(std::move(payload));
+  // }
+  // if (eom) {
+  //   XLOG(DBG1) << "eom enqueued";
+  //   objIt->second->payloadQueue.enqueue(nullptr);
+  // }
+
+  try{
+    auto obj = object_cache_.getWithoutPromotion(std::make_pair(groupId, id));
+    if (obj) {
+      if(payload){
+        XLOG(DBG1) << "payload enqueued";
+        obj->payloadQueue.enqueue(std::move(payload));
+      }
+      if (eom) {
+        XLOG(DBG1) << "eom enqueued";
+        obj->payloadQueue.enqueue(nullptr);
+      }
+    }
+  }
+  catch (const std::exception& ex) {
+    XLOG(ERR) << ex.what();
     XLOG(ERR) << "unknown object gid=" << groupId << " seq=" << id;
-    return;
-  }
-  if (payload) {
-    XLOG(DBG1) << "payload enqueued";
-    objIt->second->payloadQueue.enqueue(std::move(payload));
-  }
-  if (eom) {
-    XLOG(DBG1) << "eom enqueued";
-    objIt->second->payloadQueue.enqueue(nullptr);
   }
 }
 
 void MoQSession::onSubscribe(SubscribeRequest subscribeRequest) {
   XLOG(DBG1) << __func__;
+
   // TODO: The publisher should maintain some state like
   //   Subscribe ID -> Track Name, Locations [currently held in MoQForwarder]
   //   Track Alias -> Track Name
@@ -284,11 +332,25 @@ void MoQSession::onUnsubscribe(Unsubscribe unsubscribe) {
   XLOG(DBG1) << __func__;
   // How does this impact pending subscribes?
   // and open TrackHandles
+  // auto trackIt = subTracks_.find(unsubscribe.subscribeID);
+  // XLOG(INFO) << subTracks_.size();
+  // if (trackIt == subTracks_.end()) {
+  //   // received an object for unknown sub id
+  //   XLOG(ERR) << "unknown subscribeID=" << unsubscribe.subscribeID;
+  //   for (const auto& pair : subTracks_) {
+  //       XLOG(INFO) << pair.first << std::endl; // `pair.first` is the key
+  //   }
+  //   return;
+  // }
+  // // TODO: handle final object and status code
+  // trackIt->second->fin();
   controlMessages_.enqueue(std::move(unsubscribe));
 }
 
 void MoQSession::onSubscribeOk(SubscribeOk subOk) {
   XLOG(DBG1) << __func__;
+  XLOG(INFO) <<"id = " << id;
+
   auto subIt = subTracks_.find(subOk.subscribeID);
   if (subIt == subTracks_.end()) {
     // unknown
@@ -402,6 +464,8 @@ MoQSession::announce(Announce ann) {
   co_return co_await std::move(contract.second);
 }
 
+
+
 void MoQSession::announceOk(AnnounceOk annOk) {
   XLOG(DBG1) << __func__;
   auto res = writeAnnounceOk(controlWriteBuf_, std::move(annOk));
@@ -422,6 +486,16 @@ void MoQSession::announceError(AnnounceError announceError) {
   controlWriteEvent_.signal();
 }
 
+void MoQSession::unannounce(Unannounce unn) {
+  XLOG(INFO) << __func__;
+  auto res = writeUnannounce(controlWriteBuf_, std::move(unn));
+  if (!res) {
+    XLOG(ERR) << "writeAnnounceOk failed";
+    return;
+  }
+  controlWriteEvent_.signal();
+}
+
 folly::coro::AsyncGenerator<
     std::shared_ptr<MoQSession::TrackHandle::ObjectSource>>
 MoQSession::TrackHandle::objects() {
@@ -429,9 +503,12 @@ MoQSession::TrackHandle::objects() {
   auto cancelToken = co_await folly::coro::co_current_cancellation_token;
   auto mergeToken = folly::CancellationToken::merge(cancelToken, cancelToken_);
   while (!mergeToken.isCancellationRequested()) {
+    XLOG(DBG1) << "newObjects_ wait in while loop";
     auto obj = co_await folly::coro::co_withCancellation(
         mergeToken, newObjects_.dequeue());
+    XLOG(DBG1) << "newObjects_ found";
     if (!obj) {
+      XLOG(DBG1) << "newObjects_ does not exist";
       break;
     }
     co_yield obj;
@@ -442,6 +519,7 @@ folly::coro::Task<
     folly::Expected<std::shared_ptr<MoQSession::TrackHandle>, SubscribeError>>
 MoQSession::subscribe(SubscribeRequest sub) {
   XLOG(DBG1) << __func__;
+
   auto fullTrackName = sub.fullTrackName;
   auto subID = nextSubscribeID_++;
   sub.subscribeID = subID;
@@ -453,13 +531,14 @@ MoQSession::subscribe(SubscribeRequest sub) {
         SubscribeError({subID, 500, "local write failed", folly::none}));
   }
   controlWriteEvent_.signal();
+  XLOG(DBG1) << "after signal" ;
   auto res = subTracks_.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(subID),
       std::forward_as_tuple(std::make_shared<TrackHandle>(
           fullTrackName, subID, cancellationSource_.getToken())));
   XCHECK(res.second) << "Duplicate subscribe ID";
-
+XLOG(DBG1) << "at the end of subscribe" ;
   co_return co_await res.first->second->ready();
 }
 
@@ -474,7 +553,7 @@ void MoQSession::subscribeOk(SubscribeOk subOk) {
 }
 
 void MoQSession::subscribeError(SubscribeError subErr) {
-  XLOG(DBG1) << __func__;
+  XLOG(DBG1) << __func__ << subErr.reasonPhrase;
   auto res = writeSubscribeError(controlWriteBuf_, std::move(subErr));
   if (!res) {
     XLOG(ERR) << "writeSubscribeError failed";
@@ -484,7 +563,7 @@ void MoQSession::subscribeError(SubscribeError subErr) {
 }
 
 void MoQSession::unsubscribe(Unsubscribe unsubscribe) {
-  XLOG(DBG1) << __func__;
+  XLOG(DBG1) << __func__ << unsubscribe.subscribeID;
   auto res = writeUnsubscribe(controlWriteBuf_, std::move(unsubscribe));
   if (!res) {
     XLOG(ERR) << "writeUnsubscribe failed";
@@ -664,7 +743,7 @@ void MoQSession::publishImpl(
 }
 
 void MoQSession::onNewUniStream(proxygen::WebTransport::StreamReadHandle* rh) {
-  XLOG(DBG1) << __func__;
+  XLOG(DBG1) << __func__ << " "<<id;
   if (!setupComplete_) {
     XLOG(ERR) << "Uni stream before setup complete";
     close();

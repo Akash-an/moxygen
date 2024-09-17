@@ -19,6 +19,7 @@ moqchatclient
 moqchatserver
 moqtextclient
 moqdateserver
+moqrelayserverak
 *.cmake
 certs/
 node_modules/
@@ -26,3 +27,10 @@ package.json
 package-lock.json
 DartConfiguration.tcl
 moxygen/test/
+.idea/
+DartConfiguration.tcl
+_deps/
+RelayGlobalVars.h
+nohup.out
+valgrind.log
+build/
