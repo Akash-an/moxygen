@@ -22,8 +22,7 @@ namespace moxygen {
 
 
 
-const std::string DB_URL = "http://harperdb.moq.akadns.net:9925/";
-
+const std::string DB_URL = "https://172-236-78-145.ip.linodeusercontent.com:9927/";
 class HarperDBConnector : public proxygen::HTTPConnector::Callback {
 
 public:
